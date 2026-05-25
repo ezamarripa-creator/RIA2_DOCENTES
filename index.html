@@ -1,6 +1,44 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+
+        <script>
+    (function() {
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            return false;
+        });
+      
+       document.addEventListener('keydown', function(e) {
+            const key = e.key.toLowerCase();
+            if ((e.ctrlKey && (key === 'u' || key === 's' || key === 'c' || key === 'i' || key === 'j')) ||
+                (e.ctrlKey && e.shiftKey && (key === 'i' || key === 'j' || key === 'c')) ||
+                e.key === 'F12') {
+                e.preventDefault();
+                return false;
+            }
+        });
+        
+        let devtoolsTriggered = false;
+        setInterval(function() {
+            if (devtoolsTriggered) return;
+            const before = new Date();
+            debugger; 
+            const after = new Date();
+            if (after - before > 100) { 
+                devtoolsTriggered = true;
+                document.body.innerHTML = '<div style="text-align:center; padding:50px; font-family:sans-serif;"><h1 style="color:#042C53;">⚠️ Acceso no autorizado</h1><p>El uso de herramientas de desarrollo no está permitido en este recurso institucional.</p><p style="font-size:14px; margin-top:30px;">🔒 COBAED · Dirección Académica</p></div>';
+            }
+        }, 2000);
+        
+        const style = document.createElement('style');
+        style.textContent = `body { user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }`;
+        document.head.appendChild(style);
+    })();
+    </script>
+
+    
+    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SISTEMA SEMS - Dashboard Ejecutivo (Google Sheets)</title>
@@ -53,7 +91,7 @@
 
         #loadingOverlay { 
             display: none; 
-            background: rgba(15, 23, 42, 0.9); 
+            background: rgba(15, 23, 42, 0.95); 
             z-index: 9999; 
             position: fixed; 
             inset: 0; 
@@ -61,6 +99,7 @@
             align-items: center; 
             justify-content: center; 
             color: white; 
+            backdrop-filter: blur(4px);
         }
         
         .table-sticky { max-height: 550px; overflow-y: auto; border-radius: 8px; }
@@ -101,27 +140,45 @@
         .btn-action:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
         .btn-excel { background-color: #15803d; color: white; }
         .btn-pdf { background-color: #b91c1c; color: white; }
-        .btn-sync { background-color: #0f172a; color: white; }
+        .btn-sync { background-color: #0f172a; color: white; border: 1px solid #78350f; }
+        .btn-sync:hover { background-color: #1e293b; }
+        
+        .toast-notify {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #0f172a;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 13px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: none;
+        }
     </style>
 </head>
 <body>
 
     <div id="loadingOverlay">
         <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-amber-500 mb-4"></div>
-        <p class="text-xs font-bold tracking-[0.3em] uppercase">Sincronizando con Google Sheets...</p>
+        <p class="text-xs font-bold tracking-[0.3em] uppercase" id="loadingText">Sincronizando con Google Sheets...</p>
+        <p class="text-[10px] text-stone-300 mt-2" id="loadingSub">Extrayendo datos del archivo compartido</p>
     </div>
+    
+    <div id="toast" class="toast-notify"></div>
 
     <nav class="bg-slate-950 text-white p-6 shadow-2xl border-b-4 border-amber-900">
-        <div class="container mx-auto flex justify-between items-center">
+        <div class="container mx-auto flex justify-between items-center flex-wrap gap-4">
             <div class="flex items-center gap-4">
                 <div class="h-10 w-1 bg-amber-700"></div>
                 <div>
                     <h1 class="text-xl font-light tracking-widest uppercase">Sistema de Análisis <span class="font-bold">COBAED</span></h1>
-                    <p class="text-[9px] text-slate-400 tracking-tighter">ESTABILIDAD · AUTORIDAD · CONTROL</p>
+                    <p class="text-[9px] text-slate-400 tracking-tighter">ESTABILIDAD · AUTORIDAD · CONTROL · GOOGLE SHEETS</p>
                 </div>
             </div>
-            <div class="flex gap-4 items-center">
-                <button onclick="syncWithGoogleSheets()" class="bg-amber-800 hover:bg-amber-700 text-white px-6 py-2 rounded-sm text-[10px] font-black transition uppercase flex items-center gap-2">
+            <div class="flex gap-4 items-center flex-wrap">
+                <button id="syncBtn" class="bg-amber-800 hover:bg-amber-700 text-white px-6 py-2 rounded-sm text-[10px] font-black transition uppercase flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     Sincronizar con Google Sheets
                 </button>
@@ -174,7 +231,7 @@
                 <div class="relative">
                     <input type="text" id="search" onkeyup="searchTable()" placeholder="Buscar en el listado..." class="text-[11px] border border-stone-300 px-4 py-2.5 w-80 shadow-inner">
                 </div>
-                <div class="flex gap-3">
+                <div class="flex gap-3 flex-wrap">
                     <button onclick="exportToExcel()" class="btn-action btn-excel">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                         Exportar Excel
@@ -229,6 +286,9 @@
         // CONFIGURACIÓN - ID DEL ARCHIVO DE GOOGLE SHEETS
         const GOOGLE_SHEET_ID = '1vTjGjeIwt1U9h1_OiMMy1IqpM-aH-jN9';
         
+        // URLs de exportación (formato CSV es el más confiable)
+        const CSV_EXPORT_URL = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/export?format=csv&gid=0`;
+        
         const DB_NAME = 'SemsPremiumDB';
         const STORE_NAME = 'records';
         let db;
@@ -239,6 +299,26 @@
             negro: '#0f172a', tierra: '#78350f', beige: '#f5f5f4', crema: '#fffbeb', gris: '#94a3b8'
         };
 
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.style.backgroundColor = isError ? '#991b1b' : '#0f172a';
+            toast.innerHTML = message;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 4000);
+        }
+
+        // Helper para extraer valores de diferentes nombres de columnas
+        function getValueByKeys(obj, keys) {
+            if (!obj || typeof obj !== 'object') return null;
+            for (let key of keys) {
+                const found = Object.keys(obj).find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
+                if (found && obj[found] !== undefined && obj[found] !== null && obj[found] !== '') {
+                    return obj[found];
+                }
+            }
+            return null;
+        }
+
         // Función segura para parsear números
         const safeParseFloat = (value) => {
             if (value === null || value === undefined || value === '') return 0;
@@ -246,132 +326,211 @@
             return isNaN(num) ? 0 : num;
         };
 
-        const initDB = () => {
-            return new Promise((resolve) => {
-                const request = indexedDB.open(DB_NAME, 1);
-                request.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-                request.onsuccess = (e) => { db = e.target.result; resolve(); };
-            });
-        };
-
-        // Función para obtener datos desde Google Sheets publicados como CSV
-        const fetchGoogleSheetAsCSV = async () => {
-            // URL de exportación CSV (público, requiere que el sheet esté publicado)
-            const csvUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/export?format=csv&gid=0`;
-            const response = await fetch(csvUrl);
-            if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
-            const csvText = await response.text();
+        // Procesar datos CSV desde Google Sheets
+        async function processCSVData(csvText) {
             return new Promise((resolve, reject) => {
                 Papa.parse(csvText, {
                     header: true,
                     dynamicTyping: true,
                     skipEmptyLines: true,
                     complete: (results) => {
-                        if (results.errors.length > 0) console.warn("Errores de parseo:", results.errors);
+                        if (results.errors.length > 0) {
+                            console.warn("Errores de parseo:", results.errors);
+                        }
+                        if (!results.data || results.data.length === 0) {
+                            reject(new Error("No se encontraron datos en el CSV"));
+                            return;
+                        }
                         resolve(results.data);
                     },
                     error: (err) => reject(err)
                 });
             });
-        };
+        }
 
-        // Sincronización principal con Google Sheets
-        const syncWithGoogleSheets = async () => {
+        // Mapear datos al formato esperado por el dashboard
+        function mapDataToExpectedFormat(rawData) {
+            if (!rawData || !rawData.length) return [];
+            
+            const mapped = rawData.map((row, idx) => {
+                // Buscar valores con múltiples posibles nombres de columna
+                const plantel = getValueByKeys(row, ['plantel', 'PLANTEL', 'Plantel', 'escuela', 'Escuela', 'centro', 'CBT', 'PLANTEL/CBT']) || 'SIN PLANTEL';
+                const semestre = getValueByKeys(row, ['semestre', 'SEMESTRE', 'Semestre', 'grado', 'Grado', 'sem']) || '';
+                const turnoRaw = String(getValueByKeys(row, ['turno', 'TURNO', 'Turno', 'jornada', 'Jornada']) || '');
+                let turno = turnoRaw;
+                if (turnoRaw.toLowerCase().includes('mat')) turno = 'Matutino';
+                else if (turnoRaw.toLowerCase().includes('vesp')) turno = 'Vespertino';
+                const grupo = getValueByKeys(row, ['grupo', 'GRUPO', 'Grupo', 'gp', 'GP']) || '';
+                const materia = getValueByKeys(row, ['materia', 'MATERIA', 'Materia', 'asignatura', 'Asignatura', 'curso']) || 'N/A';
+                const nombre_doc = getValueByKeys(row, ['nombre_doc', 'NOMBRE_DOC', 'docente', 'Docente', 'profesor', 'Profesor', 'NOMBRE DOCENTE']) || 'N/A';
+                const matricula = getValueByKeys(row, ['matricula', 'MATRICULA', 'Matricula', 'id', 'ID', 'alumno_id']) || `REG_${idx}`;
+                const generoRaw = String(getValueByKeys(row, ['genero', 'GENERO', 'Genero', 'sexo', 'SEXO', 'Género']) || '');
+                let genero = generoRaw;
+                if (generoRaw === '1' || generoRaw.toLowerCase() === 'h' || generoRaw.toLowerCase() === 'hombre' || generoRaw.toLowerCase() === 'masculino') genero = 'Hombre';
+                else if (generoRaw === '2' || generoRaw.toLowerCase() === 'm' || generoRaw.toLowerCase() === 'mujer' || generoRaw.toLowerCase() === 'femenino') genero = 'Mujer';
+                const estatus = getValueByKeys(row, ['estatus', 'ESTATUS', 'Estatus', 'status', 'SITUACION']) || 'Activo';
+                const NUCLEO = getValueByKeys(row, ['NUCLEO', 'nucleo', 'Núcleo', 'núcleo']) || '';
+                const areaConocimiento = getValueByKeys(row, ['Área de conocimiento', 'area_conocimiento', 'Area', 'area', 'ÁREA']) || '';
+                const TIPO = getValueByKeys(row, ['TIPO', 'tipo', 'Tipo', 'categoria']) || '';
+                const SECTOR = getValueByKeys(row, ['SECTOR', 'sector', 'Sector']) || '';
+                
+                // Calificaciones
+                let cal1 = safeParseFloat(getValueByKeys(row, ['cal_1', 'CAL_1', 'parcial1', 'Parcial1', 'cal1', 'P1', 'PRIMER PARCIAL']));
+                let cal2 = safeParseFloat(getValueByKeys(row, ['cal_2', 'CAL_2', 'parcial2', 'Parcial2', 'cal2', 'P2', 'SEGUNDO PARCIAL']));
+                
+                // Si solo hay un promedio único
+                const promedioUnico = safeParseFloat(getValueByKeys(row, ['promedio', 'PROMEDIO', 'nota', 'NOTA', 'calificacion', 'CALIFICACION']));
+                if (cal1 === 0 && cal2 === 0 && promedioUnico > 0) {
+                    cal1 = promedioUnico;
+                    cal2 = promedioUnico;
+                }
+                
+                // Ajustar escalas (si viene en escala 0-100)
+                if (cal1 > 10 && cal1 <= 100) cal1 = cal1 / 10;
+                if (cal2 > 10 && cal2 <= 100) cal2 = cal2 / 10;
+                
+                return {
+                    plantel: String(plantel),
+                    semestre: String(semestre),
+                    turno: turno,
+                    grupo: String(grupo),
+                    materia: String(materia),
+                    nombre_doc: String(nombre_doc),
+                    matricula: String(matricula),
+                    genero: genero,
+                    estatus: String(estatus),
+                    NUCLEO: String(NUCLEO),
+                    'Área de conocimiento': String(areaConocimiento),
+                    TIPO: String(TIPO),
+                    SECTOR: String(SECTOR),
+                    cal_1: cal1,
+                    cal_2: cal2
+                };
+            });
+            
+            return mapped.filter(item => item.plantel !== 'SIN PLANTEL' || item.cal_1 > 0 || item.cal_2 > 0);
+        }
+
+        // Guardar datos en IndexedDB
+        async function saveDataToDB(data) {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            await store.clear();
+            
+            const chunkSize = 5000;
+            for (let i = 0; i < data.length; i += chunkSize) {
+                const chunk = data.slice(i, i + chunkSize);
+                chunk.forEach(item => store.add(item));
+            }
+            
+            return new Promise((resolve, reject) => {
+                tx.oncomplete = () => resolve();
+                tx.onerror = (e) => reject(e);
+            });
+        }
+
+        // Función principal de sincronización con Google Sheets
+        async function syncWithGoogleSheets() {
             const overlay = document.getElementById('loadingOverlay');
+            const loadingText = document.getElementById('loadingText');
+            const loadingSub = document.getElementById('loadingSub');
+            
             overlay.style.display = 'flex';
+            loadingText.innerText = "Conectando con Google Sheets...";
+            loadingSub.innerText = `ID: ${GOOGLE_SHEET_ID}`;
             
             try {
-                console.log("Iniciando sincronización con Google Sheet ID:", GOOGLE_SHEET_ID);
-                const rawData = await fetchGoogleSheetAsCSV();
-                
-                if (!rawData || rawData.length === 0) {
-                    throw new Error("No se encontraron datos en el Google Sheet");
-                }
-                
-                console.log(`Se obtuvieron ${rawData.length} registros del Google Sheet`);
-                
-                // Limpiar y guardar en IndexedDB
-                const tx = db.transaction(STORE_NAME, 'readwrite');
-                const store = tx.objectStore(STORE_NAME);
-                await store.clear();
-                
-                // Validar que los datos tengan las columnas esperadas, mapear campos comunes si es necesario
-                const mappedData = rawData.map(row => {
-                    // Mapeo flexible: buscar campos comunes en Google Sheets (case insensitive)
-                    const getField = (possibleNames) => {
-                        for (const name of possibleNames) {
-                            if (row[name] !== undefined) return row[name];
-                            const lowerName = name.toLowerCase();
-                            for (const key of Object.keys(row)) {
-                                if (key.toLowerCase() === lowerName) return row[key];
-                            }
-                        }
-                        return '';
-                    };
-                    
-                    return {
-                        plantel: getField(['plantel', 'PLANTEL', 'Plantel', 'escuela', 'Escuela']),
-                        semestre: getField(['semestre', 'SEMESTRE', 'Semestre', 'grado']),
-                        materia: getField(['materia', 'MATERIA', 'Materia', 'asignatura', 'Asignatura']),
-                        nombre_doc: getField(['nombre_doc', 'NOMBRE_DOC', 'docente', 'Docente', 'profesor', 'Profesor']),
-                        turno: getField(['turno', 'TURNO', 'Turno']),
-                        NUCLEO: getField(['NUCLEO', 'nucleo', 'Núcleo', 'núcleo']),
-                        'Área de conocimiento': getField(['Área de conocimiento', 'area_conocimiento', 'Area', 'area']),
-                        TIPO: getField(['TIPO', 'tipo', 'Tipo']),
-                        SECTOR: getField(['SECTOR', 'sector', 'Sector']),
-                        grupo: getField(['grupo', 'GRUPO', 'Grupo']),
-                        matricula: getField(['matricula', 'MATRICULA', 'Matricula', 'id']),
-                        genero: getField(['genero', 'GENERO', 'Género', 'sexo']),
-                        estatus: getField(['estatus', 'ESTATUS', 'Estatus', 'situacion']),
-                        cal_1: safeParseFloat(getField(['cal_1', 'CAL_1', 'parcial1', 'Parcial1', 'cal1'])),
-                        cal_2: safeParseFloat(getField(['cal_2', 'CAL_2', 'parcial2', 'Parcial2', 'cal2'])),
-                    };
+                // Intentar obtener CSV
+                loadingText.innerText = "Descargando datos...";
+                const response = await fetch(CSV_EXPORT_URL, { 
+                    cache: 'no-store',
+                    headers: { 'Cache-Control': 'no-cache' }
                 });
                 
-                // Guardar en lotes para mejor rendimiento
-                const chunkSize = 5000;
-                for (let i = 0; i < mappedData.length; i += chunkSize) {
-                    const chunk = mappedData.slice(i, i + chunkSize);
-                    chunk.forEach(item => store.add(item));
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: No se pudo acceder al archivo. Verifica que esté publicado.`);
                 }
                 
-                await new Promise((resolve) => { tx.oncomplete = resolve; });
+                const csvText = await response.text();
+                
+                if (!csvText || csvText.length < 50) {
+                    throw new Error("El archivo está vacío o no contiene datos válidos");
+                }
+                
+                loadingText.innerText = "Procesando datos CSV...";
+                const rawData = await processCSVData(csvText);
+                
+                loadingText.innerText = "Mapeando y estructurando información...";
+                const mappedData = mapDataToExpectedFormat(rawData);
+                
+                if (!mappedData.length) {
+                    throw new Error("No se pudo extraer información académica del archivo");
+                }
+                
+                loadingText.innerText = `Guardando ${mappedData.length} registros...`;
+                await saveDataToDB(mappedData);
                 
                 dataGlobal = mappedData;
-                setupFilters(); 
+                setupFilters();
                 applyFilters();
-                alert(`✅ Sincronización exitosa. Se cargaron ${dataGlobal.length} registros.`);
+                
+                showToast(`✅ Sincronización exitosa. Se cargaron ${dataGlobal.length} registros.`, false);
+                overlay.style.display = 'none';
                 
             } catch (error) {
                 console.error("Error en sincronización:", error);
-                alert(`❌ Error al sincronizar con Google Sheets: ${error.message}\n\nVerifica que el archivo esté publicado como "Cualquier persona con el enlace puede ver" y que el ID sea correcto.`);
-            } finally {
+                let errorMsg = error.message;
+                if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
+                    errorMsg = "No se pudo conectar con Google Sheets. Verifica tu conexión a internet.";
+                }
+                showToast(`❌ Error: ${errorMsg}`, true);
                 overlay.style.display = 'none';
             }
+        }
+
+        const initDB = () => {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onupgradeneeded = (e) => {
+                    e.target.result.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                };
+                request.onsuccess = (e) => { 
+                    db = e.target.result; 
+                    resolve();
+                };
+                request.onerror = (e) => reject(e);
+            });
         };
 
         const setupFilters = () => {
             if (!dataGlobal.length) return;
+            
             const fields = {
-                'f-plantel':'plantel', 'f-semestre':'semestre', 'f-materia':'materia', 
-                'f-docente':'nombre_doc', 'f-turno-filter':'turno', 'f-nucleo':'NUCLEO', 
-                'f-area':'Área de conocimiento', 'f-tipo':'TIPO', 'f-sector':'SECTOR'
+                'f-plantel': 'plantel',
+                'f-semestre': 'semestre', 
+                'f-materia': 'materia', 
+                'f-docente': 'nombre_doc', 
+                'f-turno-filter': 'turno', 
+                'f-nucleo': 'NUCLEO', 
+                'f-area': 'Área de conocimiento', 
+                'f-tipo': 'TIPO', 
+                'f-sector': 'SECTOR'
             };
+            
             Object.keys(fields).forEach(id => {
-                const vals = [...new Set(dataGlobal.map(item => item[fields[id]]))].filter(v => v && v !== '').sort();
-                let label = id.replace('f-', '').replace('-filter','').toUpperCase();
+                const vals = [...new Set(dataGlobal.map(item => item[fields[id]]))].filter(v => v && v !== '' && v !== 'N/A').sort();
+                const label = id.replace('f-', '').replace('-filter', '').toUpperCase();
                 const selectEl = document.getElementById(id);
                 if (selectEl) {
-                    selectEl.innerHTML = `<option value="ALL">${label}</option>` + vals.map(v => `<option value="${v.toString().replace(/"/g, '&quot;')}">${v}</option>`).join('');
+                    selectEl.innerHTML = `<option value="ALL">📌 ${label}</option>` + vals.map(v => `<option value="${v.toString().replace(/"/g, '&quot;')}">${v}</option>`).join('');
                 }
             });
         };
 
-        // Helper para obtener la calificación según el parcial seleccionado
+        // Obtener calificación según el parcial seleccionado
         const getCalificacion = (item, parcial) => {
             if (parcial === 'P1') return safeParseFloat(item.cal_1);
             if (parcial === 'P2') return safeParseFloat(item.cal_2);
-            // Si es ALL, promedio de ambos
             const p1 = safeParseFloat(item.cal_1);
             const p2 = safeParseFloat(item.cal_2);
             return (p1 + p2) / 2;
@@ -407,7 +566,6 @@
                 
                 if (!pass) return false;
                 
-                // Filtro por semáforo usando la calificación según el parcial seleccionado
                 const cal = getCalificacion(d, f.parcial);
                 if (f.sema === 'ROJO') return cal <= 4.0;
                 if (f.sema === 'AMARILLO') return cal > 4.0 && cal <= 6.0;
@@ -451,7 +609,7 @@
 
         // EXPORTACIÓN EXCEL
         const exportToExcel = () => {
-            if (currentFilteredData.length === 0) return alert("No hay datos cargados para exportar.");
+            if (currentFilteredData.length === 0) return showToast("No hay datos cargados para exportar.", true);
             const consolidated = getConsolidatedData(currentFilteredData);
             const wsData = consolidated.map(g => ({
                 Plantel: g.Plantel, Semestre: g.Semestre, Turno: g.Turno, Grupo: g.Grupo,
@@ -462,11 +620,12 @@
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Reporte_Docentes");
             XLSX.writeFile(wb, `Reporte_COBAED_Docentes_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast("📎 Reporte exportado a Excel", false);
         };
 
         // EXPORTACIÓN PDF
         const exportToPDF = () => {
-            if (currentFilteredData.length === 0) return alert("No hay datos cargados para exportar.");
+            if (currentFilteredData.length === 0) return showToast("No hay datos cargados para exportar.", true);
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('l', 'mm', 'a4');
             const consolidated = getConsolidatedData(currentFilteredData);
@@ -500,6 +659,7 @@
             });
 
             doc.save(`Reporte_Academico_${new Date().getTime()}.pdf`);
+            showToast("📄 Reporte exportado a PDF", false);
         };
 
         const updateKPIs = (data) => {
@@ -510,7 +670,7 @@
 
             document.getElementById('kpi-alumnos').innerText = new Set(data.map(d => d.matricula).filter(Boolean)).size.toLocaleString();
             document.getElementById('kpi-registros').innerText = totalFiltrados.toLocaleString();
-            document.getElementById('kpi-pct-riesgo').innerText = `${porcentajeRiesgo}% RIESGO ACADÉMICO`;
+            document.getElementById('kpi-pct-riesgo').innerHTML = `${porcentajeRiesgo}% RIESGO ACADÉMICO`;
             document.getElementById('kpi-total-global').innerText = dataGlobal.length.toLocaleString();
             document.getElementById('kpi-planteles').innerText = new Set(data.map(d => d.plantel)).size;
             
@@ -563,22 +723,28 @@
             }
 
             const generoCounts = getCounts('genero');
-            Plotly.newPlot('chart-genero', [{ 
-                values: Object.values(generoCounts), labels: Object.keys(generoCounts), 
-                type: 'pie', hole: .6, marker: { colors: [PALETA.negro, PALETA.gris, '#cbd5e1'] }
-            }], { ...layoutBase, title: 'GÉNERO', margin:{l:20} }, config);
+            if (Object.keys(generoCounts).length) {
+                Plotly.newPlot('chart-genero', [{ 
+                    values: Object.values(generoCounts), labels: Object.keys(generoCounts), 
+                    type: 'pie', hole: .6, marker: { colors: [PALETA.negro, PALETA.gris, '#cbd5e1'] }
+                }], { ...layoutBase, title: 'GÉNERO', margin:{l:20} }, config);
+            }
 
             const turnoCounts = getCounts('turno');
-            Plotly.newPlot('chart-turno', [{ 
-                x: Object.keys(turnoCounts), y: Object.values(turnoCounts), 
-                type: 'bar', marker: {color: PALETA.tierra} 
-            }], { ...layoutBase, title: 'TURNO', margin:{l:40} }, config);
+            if (Object.keys(turnoCounts).length) {
+                Plotly.newPlot('chart-turno', [{ 
+                    x: Object.keys(turnoCounts), y: Object.values(turnoCounts), 
+                    type: 'bar', marker: {color: PALETA.tierra} 
+                }], { ...layoutBase, title: 'TURNO', margin:{l:40} }, config);
+            }
 
             const estatusCounts = getCounts('estatus');
-            Plotly.newPlot('chart-estatus', [{ 
-                values: Object.values(estatusCounts), labels: Object.keys(estatusCounts), 
-                type: 'pie', marker: { colors: [PALETA.negro, PALETA.tierra, PALETA.gris] }
-            }], { ...layoutBase, title: 'ESTATUS', margin:{l:20} }, config);
+            if (Object.keys(estatusCounts).length) {
+                Plotly.newPlot('chart-estatus', [{ 
+                    values: Object.values(estatusCounts), labels: Object.keys(estatusCounts), 
+                    type: 'pie', marker: { colors: [PALETA.negro, PALETA.tierra, PALETA.gris] }
+                }], { ...layoutBase, title: 'ESTATUS', margin:{l:20} }, config);
+            }
 
             const getAvgBy = (field) => {
                 const map = {};
@@ -617,12 +783,12 @@
                 else color = 'color-verde';
                 
                 return `<tr>
-                    <td class="p-4 border-r font-medium">${g.Plantel || ''}</td>
-                    <td class="p-4 border-r text-center">${g.Semestre || ''}</td>
-                    <td class="p-4 border-r text-stone-500 font-bold">${g.Turno || ''}</td>
-                    <td class="p-4 text-center font-bold border-r">${g.Grupo || ''}</td>
-                    <td class="p-4 border-r">${g.Materia || ''}</td>
-                    <td class="p-4 border-r font-semibold">${g.Docente || ''}</td>
+                    <td class="p-4 border-r font-medium">${escapeHtml(g.Plantel || '')}</td>
+                    <td class="p-4 border-r text-center">${escapeHtml(g.Semestre || '')}</td>
+                    <td class="p-4 border-r text-stone-500 font-bold">${escapeHtml(g.Turno || '')}</td>
+                    <td class="p-4 text-center font-bold border-r">${escapeHtml(g.Grupo || '')}</td>
+                    <td class="p-4 border-r">${escapeHtml(g.Materia || '')}</td>
+                    <td class="p-4 border-r font-semibold">${escapeHtml(g.Docente || '')}</td>
                     <td class="p-4 text-center border-r font-bold">${g.Alumnos || 0}</td>
                     <td class="p-4 text-center border-r">${g.PromCal1 || '0.00'}</td>
                     <td class="p-4 text-center border-r">${g.PromCal2 || '0.00'}</td>
@@ -630,28 +796,57 @@
                 </tr>`;
             }).join('');
         };
+        
+        function escapeHtml(str) { 
+            if (!str) return '';
+            return String(str).replace(/[&<>]/g, function(m){
+                if(m==='&') return '&amp;';
+                if(m==='<') return '&lt;';
+                if(m==='>') return '&gt;';
+                return m;
+            });
+        }
 
         function searchTable() {
             const input = document.getElementById('search').value.toUpperCase();
             const tr = document.getElementById('tableBody').getElementsByTagName('tr');
-            for (let i = 0; i < tr.length; i++) tr[i].style.display = tr[i].innerText.toUpperCase().includes(input) ? "" : "none";
+            for (let i = 0; i < tr.length; i++) {
+                if (tr[i]) tr[i].style.display = tr[i].innerText.toUpperCase().includes(input) ? "" : "none";
+            }
         }
 
-        const clearDatabase = () => { if(confirm("¿Restablecer sistema y borrar todos los datos?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); } };
+        const clearDatabase = () => { 
+            if(confirm("¿Restablecer sistema y borrar todos los datos?")) { 
+                indexedDB.deleteDatabase(DB_NAME); 
+                localStorage.clear();
+                location.reload(); 
+            } 
+        };
 
+        // Cargar datos al inicio (desde caché primero)
         window.onload = async () => {
             await initDB();
             const tx = db.transaction(STORE_NAME, 'readonly');
             const store = tx.objectStore(STORE_NAME);
             const request = store.getAll();
             request.onsuccess = (e) => {
-                if (e.target.result.length > 0) { 
+                if (e.target.result && e.target.result.length > 0) { 
                     dataGlobal = e.target.result; 
                     setupFilters(); 
-                    applyFilters(); 
+                    applyFilters();
+                    showToast(`📊 Datos cargados desde caché (${dataGlobal.length} registros)`, false);
+                } else {
+                    // Si no hay caché, sincronizar automáticamente
+                    showToast("📡 No hay datos locales. Sincronizando con Google Sheets...", false);
+                    syncWithGoogleSheets();
                 }
             };
+            request.onerror = () => {
+                syncWithGoogleSheets();
+            };
         };
+        
+        document.getElementById('syncBtn').addEventListener('click', syncWithGoogleSheets);
     </script>
 </body>
 </html>
