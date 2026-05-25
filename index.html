@@ -357,7 +357,7 @@
                 loadingMsg.textContent = 'Conectando con Google Sheets...';
                 
                 // Método 1: Usar exportación CSV con parámetro gid=0 (primera hoja)
-                const csvUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEETS_ID}/export?format=csv&gid=0`;
+                const GOOGLE_SHEET_ID = '1vTjGjeIwt1U9h1_OiMMy1IqpM-aH-jN9';
                 
                 loadingMsg.textContent = 'Descargando datos...';
                 const response = await fetch(csvUrl, {
