@@ -306,9 +306,8 @@
 
     <script>
 
-        const GOOGLE_SHEET_ID = '1vTjGjeIwt1U9h1_OiMMy1IqpM-aH-jN9';
-        const GOOGLE_SHEET_URL =
-            `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:json`;
+   const GOOGLE_DRIVE_FILE_ID = '1vTjGjeIwt1U9h1_OiMMy1IqpM-aH-jN9';
+       
 
         const DB_NAME = 'SemsPremiumDB';
         const STORE_NAME = 'records';
@@ -349,51 +348,56 @@
             });
         };
 
-        async function syncGoogleSheets() {
+       async function syncGoogleSheets() {
 
-            try {
+    try {
 
-                document.getElementById('loadingOverlay').style.display = 'flex';
+        document.getElementById('loadingOverlay').style.display = 'flex';
 
-                const response = await fetch(GOOGLE_SHEET_URL);
-                const text = await response.text();
+        const fileId = '1vTjGjeIwt1U9h1_OiMMy1IqpM-aH-jN9';
 
-                const jsonText = text.substring(
-                    text.indexOf('{'),
-                    text.lastIndexOf('}') + 1
-                );
+        // EXPORT CSV DIRECTO DESDE DRIVE
+        const url = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx`;
 
-                const json = JSON.parse(jsonText);
+        const response = await fetch(url);
 
-                const cols = json.table.cols.map(col => col.label);
-
-                const rows = json.table.rows.map(row => {
-
-                    const obj = {};
-
-                    cols.forEach((colName, index) => {
-                        obj[colName] = row.c[index] ? row.c[index].v : '';
-                    });
-
-                    return obj;
-                });
-
-                await saveDataToDB(rows);
-
-                alert(`Sincronización completada.\n\nRegistros cargados: ${rows.length.toLocaleString()}`);
-
-            } catch (error) {
-
-                console.error(error);
-
-                alert('Error al sincronizar Google Sheets.');
-
-            } finally {
-
-                document.getElementById('loadingOverlay').style.display = 'none';
-
-            }
+        if (!response.ok) {
+            throw new Error('No se pudo descargar el archivo');
         }
+
+        const arrayBuffer = await response.arrayBuffer();
+
+        // LEER EXCEL
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+
+        // CONVERTIR A JSON
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, {
+            defval: ''
+        });
+
+        if (!jsonData.length) {
+            alert('El archivo no contiene registros.');
+            return;
+        }
+
+        await saveDataToDB(jsonData);
+
+        alert(`Sincronización completada.\n\nRegistros cargados: ${jsonData.length.toLocaleString()}`);
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert('Error al sincronizar Google Sheets / Drive');
+
+    } finally {
+
+        document.getElementById('loadingOverlay').style.display = 'none';
+
+    }
+}
 
         const saveDataToDB = async (rawData) => {
 
