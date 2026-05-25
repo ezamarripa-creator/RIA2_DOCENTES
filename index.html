@@ -1,44 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-
-        <script>
-    (function() {
-        document.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-            return false;
-        });
-      
-       document.addEventListener('keydown', function(e) {
-            const key = e.key.toLowerCase();
-            if ((e.ctrlKey && (key === 'u' || key === 's' || key === 'c' || key === 'i' || key === 'j')) ||
-                (e.ctrlKey && e.shiftKey && (key === 'i' || key === 'j' || key === 'c')) ||
-                e.key === 'F12') {
-                e.preventDefault();
-                return false;
-            }
-        });
-        
-        let devtoolsTriggered = false;
-        setInterval(function() {
-            if (devtoolsTriggered) return;
-            const before = new Date();
-            debugger; 
-            const after = new Date();
-            if (after - before > 100) { 
-                devtoolsTriggered = true;
-                document.body.innerHTML = '<div style="text-align:center; padding:50px; font-family:sans-serif;"><h1 style="color:#042C53;">⚠️ Acceso no autorizado</h1><p>El uso de herramientas de desarrollo no está permitido en este recurso institucional.</p><p style="font-size:14px; margin-top:30px;">🔒 COBAED · Dirección Académica</p></div>';
-            }
-        }, 2000);
-        
-        const style = document.createElement('style');
-        style.textContent = `body { user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }`;
-        document.head.appendChild(style);
-    })();
-    </script>
-
-    
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SISTEMA SEMS - Dashboard Ejecutivo (Google Sheets)</title>
@@ -67,7 +29,6 @@
             color: var(--negro); 
         }
         
-        /* Colores de Semáforo para Tabla */
         .color-rojo { background-color: #fee2e2; color: #991b1b; font-weight: bold; }      
         .color-amarillo { background-color: #fef9c3; color: #854d0e; font-weight: bold; }  
         .color-naranja { background-color: #ffedd5; color: #9a3412; font-weight: bold; }   
@@ -124,7 +85,6 @@
 
         select:focus { border-color: var(--tierra); outline: none; box-shadow: 0 0 0 2px rgba(120, 53, 15, 0.1); }
 
-        /* Estilos Botones Exportación */
         .btn-action {
             font-size: 11px;
             font-weight: 700;
@@ -140,8 +100,6 @@
         .btn-action:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
         .btn-excel { background-color: #15803d; color: white; }
         .btn-pdf { background-color: #b91c1c; color: white; }
-        .btn-sync { background-color: #0f172a; color: white; border: 1px solid #78350f; }
-        .btn-sync:hover { background-color: #1e293b; }
         
         .toast-notify {
             position: fixed;
@@ -155,6 +113,20 @@
             z-index: 1000;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             display: none;
+        }
+        
+        /* Loader interno */
+        .loader-inline {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -286,8 +258,12 @@
         // CONFIGURACIÓN - ID DEL ARCHIVO DE GOOGLE SHEETS
         const GOOGLE_SHEET_ID = '1vTjGjeIwt1U9h1_OiMMy1IqpM-aH-jN9';
         
-        // URLs de exportación (formato CSV es el más confiable)
-        const CSV_EXPORT_URL = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/export?format=csv&gid=0`;
+        // IMPORTANTE: Usar la URL de publicación web (requiere que el archivo esté publicado)
+        // Ve a Archivo > Compartir > Publicar en la web y publica como CSV
+        const PUBLISHED_CSV_URL = `https://docs.google.com/spreadsheets/d/e/${GOOGLE_SHEET_ID}/pub?output=csv`;
+        
+        // URL alternativa para cuando se publica como hoja de cálculo
+        const ALTERNATIVE_URL = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv`;
         
         const DB_NAME = 'SemsPremiumDB';
         const STORE_NAME = 'records';
@@ -307,11 +283,10 @@
             setTimeout(() => { toast.style.display = 'none'; }, 4000);
         }
 
-        // Helper para extraer valores de diferentes nombres de columnas
         function getValueByKeys(obj, keys) {
             if (!obj || typeof obj !== 'object') return null;
             for (let key of keys) {
-                const found = Object.keys(obj).find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
+                const found = Object.keys(obj).find(k => k && k.toLowerCase().trim() === key.toLowerCase().trim());
                 if (found && obj[found] !== undefined && obj[found] !== null && obj[found] !== '') {
                     return obj[found];
                 }
@@ -319,14 +294,37 @@
             return null;
         }
 
-        // Función segura para parsear números
         const safeParseFloat = (value) => {
             if (value === null || value === undefined || value === '') return 0;
-            const num = parseFloat(value);
+            const num = parseFloat(String(value).replace(/[^0-9.-]/g, ''));
             return isNaN(num) ? 0 : num;
         };
 
-        // Procesar datos CSV desde Google Sheets
+        async function fetchGoogleSheetData() {
+            // Intentar primero con la URL publicada
+            const urls = [PUBLISHED_CSV_URL, ALTERNATIVE_URL];
+            
+            for (const url of urls) {
+                try {
+                    console.log("Intentando con URL:", url);
+                    const response = await fetch(url, { 
+                        cache: 'no-store',
+                        headers: { 'Cache-Control': 'no-cache' }
+                    });
+                    
+                    if (response.ok) {
+                        const csvText = await response.text();
+                        if (csvText && csvText.length > 50) {
+                            return csvText;
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Error con URL:", url, e.message);
+                }
+            }
+            throw new Error("No se pudo acceder al archivo. Debes publicar el Google Sheet en la web: Archivo → Compartir → Publicar en la web → CSV");
+        }
+
         async function processCSVData(csvText) {
             return new Promise((resolve, reject) => {
                 Papa.parse(csvText, {
@@ -348,18 +346,19 @@
             });
         }
 
-        // Mapear datos al formato esperado por el dashboard
         function mapDataToExpectedFormat(rawData) {
             if (!rawData || !rawData.length) return [];
             
             const mapped = rawData.map((row, idx) => {
-                // Buscar valores con múltiples posibles nombres de columna
                 const plantel = getValueByKeys(row, ['plantel', 'PLANTEL', 'Plantel', 'escuela', 'Escuela', 'centro', 'CBT', 'PLANTEL/CBT']) || 'SIN PLANTEL';
                 const semestre = getValueByKeys(row, ['semestre', 'SEMESTRE', 'Semestre', 'grado', 'Grado', 'sem']) || '';
                 const turnoRaw = String(getValueByKeys(row, ['turno', 'TURNO', 'Turno', 'jornada', 'Jornada']) || '');
                 let turno = turnoRaw;
                 if (turnoRaw.toLowerCase().includes('mat')) turno = 'Matutino';
                 else if (turnoRaw.toLowerCase().includes('vesp')) turno = 'Vespertino';
+                else if (turnoRaw === '1') turno = 'Matutino';
+                else if (turnoRaw === '2') turno = 'Vespertino';
+                
                 const grupo = getValueByKeys(row, ['grupo', 'GRUPO', 'Grupo', 'gp', 'GP']) || '';
                 const materia = getValueByKeys(row, ['materia', 'MATERIA', 'Materia', 'asignatura', 'Asignatura', 'curso']) || 'N/A';
                 const nombre_doc = getValueByKeys(row, ['nombre_doc', 'NOMBRE_DOC', 'docente', 'Docente', 'profesor', 'Profesor', 'NOMBRE DOCENTE']) || 'N/A';
@@ -368,24 +367,22 @@
                 let genero = generoRaw;
                 if (generoRaw === '1' || generoRaw.toLowerCase() === 'h' || generoRaw.toLowerCase() === 'hombre' || generoRaw.toLowerCase() === 'masculino') genero = 'Hombre';
                 else if (generoRaw === '2' || generoRaw.toLowerCase() === 'm' || generoRaw.toLowerCase() === 'mujer' || generoRaw.toLowerCase() === 'femenino') genero = 'Mujer';
+                
                 const estatus = getValueByKeys(row, ['estatus', 'ESTATUS', 'Estatus', 'status', 'SITUACION']) || 'Activo';
                 const NUCLEO = getValueByKeys(row, ['NUCLEO', 'nucleo', 'Núcleo', 'núcleo']) || '';
                 const areaConocimiento = getValueByKeys(row, ['Área de conocimiento', 'area_conocimiento', 'Area', 'area', 'ÁREA']) || '';
                 const TIPO = getValueByKeys(row, ['TIPO', 'tipo', 'Tipo', 'categoria']) || '';
                 const SECTOR = getValueByKeys(row, ['SECTOR', 'sector', 'Sector']) || '';
                 
-                // Calificaciones
-                let cal1 = safeParseFloat(getValueByKeys(row, ['cal_1', 'CAL_1', 'parcial1', 'Parcial1', 'cal1', 'P1', 'PRIMER PARCIAL']));
-                let cal2 = safeParseFloat(getValueByKeys(row, ['cal_2', 'CAL_2', 'parcial2', 'Parcial2', 'cal2', 'P2', 'SEGUNDO PARCIAL']));
+                let cal1 = safeParseFloat(getValueByKeys(row, ['cal_1', 'CAL_1', 'parcial1', 'Parcial1', 'cal1', 'P1', 'PRIMER PARCIAL', 'CAL1']));
+                let cal2 = safeParseFloat(getValueByKeys(row, ['cal_2', 'CAL_2', 'parcial2', 'Parcial2', 'cal2', 'P2', 'SEGUNDO PARCIAL', 'CAL2']));
                 
-                // Si solo hay un promedio único
                 const promedioUnico = safeParseFloat(getValueByKeys(row, ['promedio', 'PROMEDIO', 'nota', 'NOTA', 'calificacion', 'CALIFICACION']));
                 if (cal1 === 0 && cal2 === 0 && promedioUnico > 0) {
                     cal1 = promedioUnico;
                     cal2 = promedioUnico;
                 }
                 
-                // Ajustar escalas (si viene en escala 0-100)
                 if (cal1 > 10 && cal1 <= 100) cal1 = cal1 / 10;
                 if (cal2 > 10 && cal2 <= 100) cal2 = cal2 / 10;
                 
@@ -411,7 +408,6 @@
             return mapped.filter(item => item.plantel !== 'SIN PLANTEL' || item.cal_1 > 0 || item.cal_2 > 0);
         }
 
-        // Guardar datos en IndexedDB
         async function saveDataToDB(data) {
             const tx = db.transaction(STORE_NAME, 'readwrite');
             const store = tx.objectStore(STORE_NAME);
@@ -429,7 +425,6 @@
             });
         }
 
-        // Función principal de sincronización con Google Sheets
         async function syncWithGoogleSheets() {
             const overlay = document.getElementById('loadingOverlay');
             const loadingText = document.getElementById('loadingText');
@@ -440,22 +435,10 @@
             loadingSub.innerText = `ID: ${GOOGLE_SHEET_ID}`;
             
             try {
-                // Intentar obtener CSV
                 loadingText.innerText = "Descargando datos...";
-                const response = await fetch(CSV_EXPORT_URL, { 
-                    cache: 'no-store',
-                    headers: { 'Cache-Control': 'no-cache' }
-                });
+                loadingSub.innerText = "Usando URL de publicación web";
                 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: No se pudo acceder al archivo. Verifica que esté publicado.`);
-                }
-                
-                const csvText = await response.text();
-                
-                if (!csvText || csvText.length < 50) {
-                    throw new Error("El archivo está vacío o no contiene datos válidos");
-                }
+                const csvText = await fetchGoogleSheetData();
                 
                 loadingText.innerText = "Procesando datos CSV...";
                 const rawData = await processCSVData(csvText);
@@ -483,7 +466,10 @@
                 if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
                     errorMsg = "No se pudo conectar con Google Sheets. Verifica tu conexión a internet.";
                 }
-                showToast(`❌ Error: ${errorMsg}`, true);
+                if (errorMsg.includes('publicar')) {
+                    errorMsg = "⚠️ El archivo no está publicado. Ve a Archivo → Compartir → Publicar en la web → CSV y luego intenta nuevamente.";
+                }
+                showToast(`❌ ${errorMsg}`, true);
                 overlay.style.display = 'none';
             }
         }
@@ -519,15 +505,13 @@
             
             Object.keys(fields).forEach(id => {
                 const vals = [...new Set(dataGlobal.map(item => item[fields[id]]))].filter(v => v && v !== '' && v !== 'N/A').sort();
-                const label = id.replace('f-', '').replace('-filter', '').toUpperCase();
                 const selectEl = document.getElementById(id);
                 if (selectEl) {
-                    selectEl.innerHTML = `<option value="ALL">📌 ${label}</option>` + vals.map(v => `<option value="${v.toString().replace(/"/g, '&quot;')}">${v}</option>`).join('');
+                    selectEl.innerHTML = `<option value="ALL">📌 TODOS</option>` + vals.map(v => `<option value="${v.toString().replace(/"/g, '&quot;')}">${v}</option>`).join('');
                 }
             });
         };
 
-        // Obtener calificación según el parcial seleccionado
         const getCalificacion = (item, parcial) => {
             if (parcial === 'P1') return safeParseFloat(item.cal_1);
             if (parcial === 'P2') return safeParseFloat(item.cal_2);
@@ -607,7 +591,6 @@
             });
         };
 
-        // EXPORTACIÓN EXCEL
         const exportToExcel = () => {
             if (currentFilteredData.length === 0) return showToast("No hay datos cargados para exportar.", true);
             const consolidated = getConsolidatedData(currentFilteredData);
@@ -623,7 +606,6 @@
             showToast("📎 Reporte exportado a Excel", false);
         };
 
-        // EXPORTACIÓN PDF
         const exportToPDF = () => {
             if (currentFilteredData.length === 0) return showToast("No hay datos cargados para exportar.", true);
             const { jsPDF } = window.jspdf;
@@ -823,7 +805,6 @@
             } 
         };
 
-        // Cargar datos al inicio (desde caché primero)
         window.onload = async () => {
             await initDB();
             const tx = db.transaction(STORE_NAME, 'readonly');
@@ -836,7 +817,6 @@
                     applyFilters();
                     showToast(`📊 Datos cargados desde caché (${dataGlobal.length} registros)`, false);
                 } else {
-                    // Si no hay caché, sincronizar automáticamente
                     showToast("📡 No hay datos locales. Sincronizando con Google Sheets...", false);
                     syncWithGoogleSheets();
                 }
