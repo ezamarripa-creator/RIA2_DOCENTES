@@ -1,44 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <script>
-    (function() {
-        document.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-            return false;
-        });
-      
-       document.addEventListener('keydown', function(e) {
-            const key = e.key.toLowerCase();
-            if ((e.ctrlKey && (key === 'u' || key === 's' || key === 'c' || key === 'i' || key === 'j')) ||
-                (e.ctrlKey && e.shiftKey && (key === 'i' || key === 'j' || key === 'c')) ||
-                e.key === 'F12') {
-                e.preventDefault();
-                return false;
-            }
-        });
-        
-        let devtoolsTriggered = false;
-        setInterval(function() {
-            if (devtoolsTriggered) return;
-            const before = new Date();
-            debugger; 
-            const after = new Date();
-            if (after - before > 100) { 
-                devtoolsTriggered = true;
-                document.body.innerHTML = '<div style="text-align:center; padding:50px; font-family:sans-serif;"><h1 style="color:#042C53;">⚠️ Acceso no autorizado</h1><p>El uso de herramientas de desarrollo no está permitido en este recurso institucional.</p><p style="font-size:14px; margin-top:30px;">🔒 COBAED · Dirección Académica</p></div>';
-            }
-        }, 2000);
-        
-        const style = document.createElement('style');
-        style.textContent = `body { user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }`;
-        document.head.appendChild(style);
-    })();
-    </script>
-
-        
-        
-        <meta charset="UTF-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SISTEMA SEMS - Dashboard Ejecutivo (Google Sheets)</title>
     
@@ -66,6 +29,7 @@
             color: var(--negro); 
         }
         
+        /* Colores de Semáforo para Tabla */
         .color-rojo { background-color: #fee2e2; color: #991b1b; font-weight: bold; }      
         .color-amarillo { background-color: #fef9c3; color: #854d0e; font-weight: bold; }  
         .color-naranja { background-color: #ffedd5; color: #9a3412; font-weight: bold; }   
@@ -121,6 +85,7 @@
 
         select:focus { border-color: var(--tierra); outline: none; box-shadow: 0 0 0 2px rgba(120, 53, 15, 0.1); }
 
+        /* Estilos Botones Exportación */
         .btn-action {
             font-size: 11px;
             font-weight: 700;
@@ -136,27 +101,18 @@
         .btn-action:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
         .btn-excel { background-color: #15803d; color: white; }
         .btn-pdf { background-color: #b91c1c; color: white; }
-        .btn-sync { background-color: #1e3a8a; color: white; }
-        
-        .instruction-box {
-            background: #fef3c7;
-            border-left: 4px solid #d97706;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 8px;
-            font-size: 12px;
-        }
+        .btn-sync { background-color: #0f172a; color: white; }
     </style>
 </head>
 <body>
 
     <div id="loadingOverlay">
         <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-amber-500 mb-4"></div>
-        <p class="text-xs font-bold tracking-[0.3em] uppercase" id="loadingMessage">Sincronizando con Google Sheets...</p>
+        <p class="text-xs font-bold tracking-[0.3em] uppercase">Sincronizando con Google Sheets...</p>
     </div>
 
     <nav class="bg-slate-950 text-white p-6 shadow-2xl border-b-4 border-amber-900">
-        <div class="container mx-auto flex justify-between items-center flex-wrap gap-4">
+        <div class="container mx-auto flex justify-between items-center">
             <div class="flex items-center gap-4">
                 <div class="h-10 w-1 bg-amber-700"></div>
                 <div>
@@ -164,10 +120,9 @@
                     <p class="text-[9px] text-slate-400 tracking-tighter">ESTABILIDAD · AUTORIDAD · CONTROL</p>
                 </div>
             </div>
-            <div class="flex gap-4 items-center flex-wrap">
-                <input type="text" id="sheetIdInput" class="bg-slate-800 text-white px-4 py-2 rounded text-[11px] w-64" placeholder="ID de Google Sheets" value="1vTjGjeIwt1U9h1_OiMMy1IqpM-aH-jN9">
-                <button id="syncButton" class="bg-amber-700 text-white px-6 py-2 rounded-sm text-[10px] font-black hover:bg-amber-800 transition uppercase flex items-center gap-2">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            <div class="flex gap-4 items-center">
+                <button onclick="syncWithGoogleSheets()" class="bg-amber-800 hover:bg-amber-700 text-white px-6 py-2 rounded-sm text-[10px] font-black transition uppercase flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     Sincronizar con Google Sheets
                 </button>
                 <button onclick="clearDatabase()" class="text-stone-500 hover:text-red-400 text-[10px] uppercase font-bold">Reiniciar</button>
@@ -176,26 +131,6 @@
     </nav>
 
     <main class="container mx-auto p-4 lg:p-8">
-        <!-- Instrucciones de publicación -->
-        <div class="instruction-box mb-6 hidden" id="instructionBox">
-            <div class="flex items-start gap-3">
-                <div class="text-2xl">⚠️</div>
-                <div>
-                    <p class="font-bold text-amber-800 mb-1">¿Error de sincronización? Sigue estos pasos:</p>
-                    <ol class="list-decimal list-inside text-amber-800 space-y-1">
-                        <li>Abre tu <strong>Google Sheets</strong> con los datos</li>
-                        <li>Ve a <strong>Archivo → Compartir → Publicar en web</strong></li>
-                        <li>Selecciona la <strong>Hoja correcta</strong> (la que contiene los datos)</li>
-                        <li>En "Tipo de archivo", elige <strong>"Valores separados por comas (.csv)"</strong></li>
-                        <li>Haz clic en <strong>"Publicar"</strong> y acepta la confirmación</li>
-                        <li>Copia el ID de tu documento (el código largo en la URL) o usa el que ya tienes</li>
-                        <li>¡Listo! Ahora haz clic en "Sincronizar" nuevamente</li>
-                    </ol>
-                    <button onclick="document.getElementById('instructionBox').classList.add('hidden')" class="mt-2 text-xs text-amber-600 font-bold">Entendido, cerrar</button>
-                </div>
-            </div>
-        </div>
-
         <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <div class="kpi-card p-6"><p class="text-[10px] font-bold text-slate-400 uppercase mb-2">Población Estudiantil</p><h2 id="kpi-alumnos" class="text-3xl font-bold">0</h2></div>
             <div class="kpi-card p-6">
@@ -291,8 +226,8 @@
     </main>
 
     <script>
-        // Configuración
-        let GOOGLE_SHEETS_ID = "1vTjGjeIwt1U9h1_OiMMy1IqpM-aH-jN9";
+        // CONFIGURACIÓN - ID DEL ARCHIVO DE GOOGLE SHEETS
+        const GOOGLE_SHEET_ID = '1vTjGjeIwt1U9h1_OiMMy1IqpM-aH-jN9';
         
         const DB_NAME = 'SemsPremiumDB';
         const STORE_NAME = 'records';
@@ -304,6 +239,7 @@
             negro: '#0f172a', tierra: '#78350f', beige: '#f5f5f4', crema: '#fffbeb', gris: '#94a3b8'
         };
 
+        // Función segura para parsear números
         const safeParseFloat = (value) => {
             if (value === null || value === undefined || value === '') return 0;
             const num = parseFloat(value);
@@ -315,182 +251,147 @@
                 const request = indexedDB.open(DB_NAME, 1);
                 request.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
                 request.onsuccess = (e) => { db = e.target.result; resolve(); };
-                request.onerror = () => resolve();
             });
         };
 
-        const saveDataToDB = async (rawData) => {
-            const tx = db.transaction(STORE_NAME, 'readwrite');
-            const store = tx.objectStore(STORE_NAME);
-            await store.clear();
-
-            const chunkSize = 5000;
-            for (let i = 0; i < rawData.length; i += chunkSize) {
-                const chunk = rawData.slice(i, i + chunkSize);
-                chunk.forEach(item => store.add(item));
-            }
-
-            return new Promise((resolve) => {
-                tx.oncomplete = () => {
-                    dataGlobal = rawData;
-                    resolve();
-                };
-                tx.onerror = () => resolve();
-            });
-        };
-
-        // Cargar desde Google Sheets usando múltiples métodos
-        const loadFromGoogleSheets = async () => {
-            const overlay = document.getElementById('loadingOverlay');
-            const loadingMsg = document.getElementById('loadingMessage');
-            overlay.style.display = 'flex';
-            
-            // Obtener ID del input
-            GOOGLE_SHEETS_ID = document.getElementById('sheetIdInput').value.trim();
-            if (!GOOGLE_SHEETS_ID) {
-                alert("Por favor ingresa el ID de Google Sheets");
-                overlay.style.display = 'none';
-                return false;
-            }
-            
-            try {
-                loadingMsg.textContent = 'Conectando con Google Sheets...';
-                
-                // Método 1: Usar exportación CSV con parámetro gid=0 (primera hoja)
-                const GOOGLE_SHEET_ID = '1vTjGjeIwt1U9h1_OiMMy1IqpM-aH-jN9';
-                
-                loadingMsg.textContent = 'Descargando datos...';
-                const response = await fetch(csvUrl, {
-                    cache: 'no-store',
-                    headers: {
-                        'Cache-Control': 'no-cache'
-                    }
-                });
-                
-                if (!response.ok) {
-                    // Si falla, intentar con el método alternativo (publicado)
-                    throw new Error(`HTTP ${response.status}: No se pudo acceder. Verifica que la hoja esté publicada.`);
-                }
-                
-                const csvText = await response.text();
-                
-                // Verificar si el CSV tiene contenido válido
-                if (!csvText || csvText.trim().length === 0 || csvText.includes("<!DOCTYPE")) {
-                    throw new Error("El archivo CSV no contiene datos válidos. Asegúrate de haber publicado la hoja correctamente.");
-                }
-                
-                loadingMsg.textContent = 'Procesando datos...';
-                
-                const parsed = Papa.parse(csvText, {
+        // Función para obtener datos desde Google Sheets publicados como CSV
+        const fetchGoogleSheetAsCSV = async () => {
+            // URL de exportación CSV (público, requiere que el sheet esté publicado)
+            const csvUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/export?format=csv&gid=0`;
+            const response = await fetch(csvUrl);
+            if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+            const csvText = await response.text();
+            return new Promise((resolve, reject) => {
+                Papa.parse(csvText, {
                     header: true,
                     dynamicTyping: true,
-                    skipEmptyLines: true
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        if (results.errors.length > 0) console.warn("Errores de parseo:", results.errors);
+                        resolve(results.data);
+                    },
+                    error: (err) => reject(err)
                 });
+            });
+        };
+
+        // Sincronización principal con Google Sheets
+        const syncWithGoogleSheets = async () => {
+            const overlay = document.getElementById('loadingOverlay');
+            overlay.style.display = 'flex';
+            
+            try {
+                console.log("Iniciando sincronización con Google Sheet ID:", GOOGLE_SHEET_ID);
+                const rawData = await fetchGoogleSheetAsCSV();
                 
-                if (parsed.errors && parsed.errors.length > 0) {
-                    console.warn("Advertencias:", parsed.errors);
-                }
-                
-                let rawData = parsed.data;
                 if (!rawData || rawData.length === 0) {
-                    throw new Error("No se encontraron datos en el CSV.");
+                    throw new Error("No se encontraron datos en el Google Sheet");
                 }
                 
-                // Limpiar datos
-                rawData = rawData.filter(row => Object.keys(row).length > 1); // Filtrar filas vacías
+                console.log(`Se obtuvieron ${rawData.length} registros del Google Sheet`);
                 
-                if (rawData.length === 0) {
-                    throw new Error("El archivo CSV está vacío.");
-                }
+                // Limpiar y guardar en IndexedDB
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                await store.clear();
                 
-                // Normalizar nombres de columnas
-                rawData = rawData.map(row => {
-                    const cleanRow = {};
-                    Object.keys(row).forEach(key => {
-                        let newKey = key;
-                        const lowerKey = key.toLowerCase().trim();
-                        if (lowerKey.includes('matricula')) newKey = 'matricula';
-                        else if (lowerKey.includes('nombre_doc') || lowerKey.includes('docente') || lowerKey === 'docente') newKey = 'nombre_doc';
-                        else if (lowerKey.includes('cal_1') || lowerKey === 'cal1') newKey = 'cal_1';
-                        else if (lowerKey.includes('cal_2') || lowerKey === 'cal2') newKey = 'cal_2';
-                        else if (lowerKey.includes('plantel')) newKey = 'plantel';
-                        else if (lowerKey.includes('semestre')) newKey = 'semestre';
-                        else if (lowerKey.includes('materia')) newKey = 'materia';
-                        else if (lowerKey.includes('turno')) newKey = 'turno';
-                        else if (lowerKey.includes('grupo')) newKey = 'grupo';
-                        else if (lowerKey.includes('genero')) newKey = 'genero';
-                        else if (lowerKey.includes('estatus')) newKey = 'estatus';
-                        else if (lowerKey.includes('nucleo')) newKey = 'NUCLEO';
-                        else if (lowerKey.includes('área') || lowerKey.includes('area')) newKey = 'Área de conocimiento';
-                        else if (lowerKey.includes('tipo')) newKey = 'TIPO';
-                        else if (lowerKey.includes('sector')) newKey = 'SECTOR';
-                        else newKey = key;
-                        cleanRow[newKey] = row[key];
-                    });
-                    cleanRow.cal_1 = safeParseFloat(cleanRow.cal_1);
-                    cleanRow.cal_2 = safeParseFloat(cleanRow.cal_2);
-                    return cleanRow;
+                // Validar que los datos tengan las columnas esperadas, mapear campos comunes si es necesario
+                const mappedData = rawData.map(row => {
+                    // Mapeo flexible: buscar campos comunes en Google Sheets (case insensitive)
+                    const getField = (possibleNames) => {
+                        for (const name of possibleNames) {
+                            if (row[name] !== undefined) return row[name];
+                            const lowerName = name.toLowerCase();
+                            for (const key of Object.keys(row)) {
+                                if (key.toLowerCase() === lowerName) return row[key];
+                            }
+                        }
+                        return '';
+                    };
+                    
+                    return {
+                        plantel: getField(['plantel', 'PLANTEL', 'Plantel', 'escuela', 'Escuela']),
+                        semestre: getField(['semestre', 'SEMESTRE', 'Semestre', 'grado']),
+                        materia: getField(['materia', 'MATERIA', 'Materia', 'asignatura', 'Asignatura']),
+                        nombre_doc: getField(['nombre_doc', 'NOMBRE_DOC', 'docente', 'Docente', 'profesor', 'Profesor']),
+                        turno: getField(['turno', 'TURNO', 'Turno']),
+                        NUCLEO: getField(['NUCLEO', 'nucleo', 'Núcleo', 'núcleo']),
+                        'Área de conocimiento': getField(['Área de conocimiento', 'area_conocimiento', 'Area', 'area']),
+                        TIPO: getField(['TIPO', 'tipo', 'Tipo']),
+                        SECTOR: getField(['SECTOR', 'sector', 'Sector']),
+                        grupo: getField(['grupo', 'GRUPO', 'Grupo']),
+                        matricula: getField(['matricula', 'MATRICULA', 'Matricula', 'id']),
+                        genero: getField(['genero', 'GENERO', 'Género', 'sexo']),
+                        estatus: getField(['estatus', 'ESTATUS', 'Estatus', 'situacion']),
+                        cal_1: safeParseFloat(getField(['cal_1', 'CAL_1', 'parcial1', 'Parcial1', 'cal1'])),
+                        cal_2: safeParseFloat(getField(['cal_2', 'CAL_2', 'parcial2', 'Parcial2', 'cal2'])),
+                    };
                 });
                 
-                await saveDataToDB(rawData);
+                // Guardar en lotes para mejor rendimiento
+                const chunkSize = 5000;
+                for (let i = 0; i < mappedData.length; i += chunkSize) {
+                    const chunk = mappedData.slice(i, i + chunkSize);
+                    chunk.forEach(item => store.add(item));
+                }
+                
+                await new Promise((resolve) => { tx.oncomplete = resolve; });
+                
+                dataGlobal = mappedData;
                 setupFilters(); 
                 applyFilters();
-                
-                overlay.style.display = 'none';
-                alert(`✅ Sincronización exitosa!\n\nSe cargaron ${rawData.length.toLocaleString()} registros.`);
-                return true;
+                alert(`✅ Sincronización exitosa. Se cargaron ${dataGlobal.length} registros.`);
                 
             } catch (error) {
-                console.error("Error:", error);
+                console.error("Error en sincronización:", error);
+                alert(`❌ Error al sincronizar con Google Sheets: ${error.message}\n\nVerifica que el archivo esté publicado como "Cualquier persona con el enlace puede ver" y que el ID sea correcto.`);
+            } finally {
                 overlay.style.display = 'none';
-                
-                // Mostrar instrucciones detalladas
-                document.getElementById('instructionBox').classList.remove('hidden');
-                
-                let errorMsg = error.message;
-                if (errorMsg.includes("HTTP 400") || errorMsg.includes("HTTP 403") || errorMsg.includes("HTTP 404")) {
-                    errorMsg = "No se puede acceder al archivo. Debes PUBLICAR la hoja como CSV primero.";
-                }
-                
-                alert(`❌ Error al sincronizar: ${errorMsg}\n\n📌 Para solucionarlo:\n1. Abre tu Google Sheets\n2. Ve a Archivo → Compartir → Publicar en web\n3. Selecciona la hoja y elige "Valores separados por comas (.csv)"\n4. Haz clic en "Publicar"\n5. Vuelve a intentar`);
-                return false;
             }
         };
 
         const setupFilters = () => {
+            if (!dataGlobal.length) return;
             const fields = {
                 'f-plantel':'plantel', 'f-semestre':'semestre', 'f-materia':'materia', 
                 'f-docente':'nombre_doc', 'f-turno-filter':'turno', 'f-nucleo':'NUCLEO', 
                 'f-area':'Área de conocimiento', 'f-tipo':'TIPO', 'f-sector':'SECTOR'
             };
             Object.keys(fields).forEach(id => {
-                const vals = [...new Set(dataGlobal.map(item => item[fields[id]]))].filter(Boolean).sort();
+                const vals = [...new Set(dataGlobal.map(item => item[fields[id]]))].filter(v => v && v !== '').sort();
                 let label = id.replace('f-', '').replace('-filter','').toUpperCase();
-                document.getElementById(id).innerHTML = `<option value="ALL">${label}</option>` + vals.map(v => `<option value="${v.replace(/"/g, '&quot;')}">${v}</option>`).join('');
+                const selectEl = document.getElementById(id);
+                if (selectEl) {
+                    selectEl.innerHTML = `<option value="ALL">${label}</option>` + vals.map(v => `<option value="${v.toString().replace(/"/g, '&quot;')}">${v}</option>`).join('');
+                }
             });
         };
 
+        // Helper para obtener la calificación según el parcial seleccionado
         const getCalificacion = (item, parcial) => {
             if (parcial === 'P1') return safeParseFloat(item.cal_1);
             if (parcial === 'P2') return safeParseFloat(item.cal_2);
+            // Si es ALL, promedio de ambos
             const p1 = safeParseFloat(item.cal_1);
             const p2 = safeParseFloat(item.cal_2);
             return (p1 + p2) / 2;
         };
 
         const applyFilters = () => {
+            if (!dataGlobal.length) return;
+            
             const f = {
-                p: document.getElementById('f-plantel').value,
-                s: document.getElementById('f-semestre').value,
-                m: document.getElementById('f-materia').value,
-                d: document.getElementById('f-docente').value,
-                tr: document.getElementById('f-turno-filter').value,
-                n: document.getElementById('f-nucleo').value,
-                a: document.getElementById('f-area').value,
-                t: document.getElementById('f-tipo').value,
-                sec: document.getElementById('f-sector').value,
-                parcial: document.getElementById('f-parcial').value,
-                sema: document.getElementById('f-semaforo').value
+                p: document.getElementById('f-plantel')?.value || 'ALL',
+                s: document.getElementById('f-semestre')?.value || 'ALL',
+                m: document.getElementById('f-materia')?.value || 'ALL',
+                d: document.getElementById('f-docente')?.value || 'ALL',
+                tr: document.getElementById('f-turno-filter')?.value || 'ALL',
+                n: document.getElementById('f-nucleo')?.value || 'ALL',
+                a: document.getElementById('f-area')?.value || 'ALL',
+                t: document.getElementById('f-tipo')?.value || 'ALL',
+                sec: document.getElementById('f-sector')?.value || 'ALL',
+                parcial: document.getElementById('f-parcial')?.value || 'ALL',
+                sema: document.getElementById('f-semaforo')?.value || 'ALL'
             };
 
             currentFilteredData = dataGlobal.filter(d => {
@@ -503,7 +404,10 @@
                              (f.a === 'ALL' || d['Área de conocimiento'] == f.a) && 
                              (f.t === 'ALL' || d.TIPO == f.t) && 
                              (f.sec === 'ALL' || d.SECTOR == f.sec);
+                
                 if (!pass) return false;
+                
+                // Filtro por semáforo usando la calificación según el parcial seleccionado
                 const cal = getCalificacion(d, f.parcial);
                 if (f.sema === 'ROJO') return cal <= 4.0;
                 if (f.sema === 'AMARILLO') return cal > 4.0 && cal <= 6.0;
@@ -536,10 +440,16 @@
                 const p1 = parseFloat(promCal1);
                 const p2 = parseFloat(promCal2);
                 const promedioGeneral = ((p1 + p2) / 2).toFixed(2);
-                return { ...g, PromCal1: promCal1, PromCal2: promCal2, PromedioGeneral: promedioGeneral };
+                return {
+                    ...g, 
+                    PromCal1: promCal1,
+                    PromCal2: promCal2,
+                    PromedioGeneral: promedioGeneral
+                };
             });
         };
 
+        // EXPORTACIÓN EXCEL
         const exportToExcel = () => {
             if (currentFilteredData.length === 0) return alert("No hay datos cargados para exportar.");
             const consolidated = getConsolidatedData(currentFilteredData);
@@ -554,6 +464,7 @@
             XLSX.writeFile(wb, `Reporte_COBAED_Docentes_${new Date().toISOString().slice(0,10)}.xlsx`);
         };
 
+        // EXPORTACIÓN PDF
         const exportToPDF = () => {
             if (currentFilteredData.length === 0) return alert("No hay datos cargados para exportar.");
             const { jsPDF } = window.jspdf;
@@ -565,12 +476,17 @@
             doc.setFontSize(22);
             doc.setTextColor(255, 255, 255);
             doc.text("COBAED - REPORTE EJECUTIVO DE DESEMPEÑO", 15, 22);
+            
             doc.setFontSize(10);
             doc.setTextColor(200, 200, 200);
             doc.text(`Generado el: ${new Date().toLocaleString()}`, 15, 28);
             doc.text(`Total registros: ${currentFilteredData.length}`, 240, 28);
 
-            const tableRows = consolidated.map(g => [g.Plantel, g.Semestre, g.Turno, g.Grupo, g.Materia, g.Docente, g.Alumnos, g.PromCal1, g.PromCal2, g.PromedioGeneral]);
+            const tableRows = consolidated.map(g => [
+                g.Plantel, g.Semestre, g.Turno, g.Grupo, 
+                g.Materia, g.Docente, g.Alumnos, 
+                g.PromCal1, g.PromCal2, g.PromedioGeneral
+            ]);
 
             doc.autoTable({
                 startY: 45,
@@ -582,38 +498,49 @@
                 alternateRowStyles: { fillColor: [248, 250, 252] },
                 columnStyles: { 6: { halign: 'center' }, 7: { halign: 'center' }, 8: { halign: 'center' }, 9: { halign: 'center', fontStyle: 'bold' } }
             });
+
             doc.save(`Reporte_Academico_${new Date().getTime()}.pdf`);
         };
 
         const updateKPIs = (data) => {
-            const parcial = document.getElementById('f-parcial').value;
+            const parcial = document.getElementById('f-parcial')?.value || 'ALL';
             const totalFiltrados = data.length;
             const registrosRiesgo = data.filter(d => getCalificacion(d, parcial) < 6.0).length;
             const porcentajeRiesgo = totalFiltrados > 0 ? ((registrosRiesgo / totalFiltrados) * 100).toFixed(1) : "0.0";
-            document.getElementById('kpi-alumnos').innerText = new Set(data.map(d => d.matricula)).size.toLocaleString();
+
+            document.getElementById('kpi-alumnos').innerText = new Set(data.map(d => d.matricula).filter(Boolean)).size.toLocaleString();
             document.getElementById('kpi-registros').innerText = totalFiltrados.toLocaleString();
             document.getElementById('kpi-pct-riesgo').innerText = `${porcentajeRiesgo}% RIESGO ACADÉMICO`;
             document.getElementById('kpi-total-global').innerText = dataGlobal.length.toLocaleString();
             document.getElementById('kpi-planteles').innerText = new Set(data.map(d => d.plantel)).size;
+            
             let sum = 0;
             data.forEach(d => { sum += getCalificacion(d, parcial); });
             document.getElementById('kpi-promedio').innerText = (sum / (totalFiltrados || 1)).toFixed(1);
         };
 
         const updateCharts = (data) => {
-            const parcial = document.getElementById('f-parcial').value;
+            const parcial = document.getElementById('f-parcial')?.value || 'ALL';
             const config = { responsive: true, displayModeBar: false };
-            const layoutBase = { paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { size: 10, family: 'Inter', color: PALETA.negro }, margin: { t: 40, b: 60, l: 150, r: 20 } };
-            const getCounts = (f) => { const c = {}; data.forEach(d => c[d[f]] = (c[d[f]] || 0) + 1); return c; };
+            const layoutBase = { 
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', 
+                font: { size: 10, family: 'Inter', color: PALETA.negro }, 
+                margin: { t: 40, b: 60, l: 150, r: 20 } 
+            };
+            const getCounts = (f) => { const c = {}; data.forEach(d => { if(d[f]) c[d[f]] = (c[d[f]] || 0) + 1; }); return c; };
 
             const ranges = ["0-4", "4.1-6", "6.1-8", "> 8"];
             let distP1 = [0,0,0,0], distP2 = [0,0,0,0];
+            
             data.forEach(d => {
-                const v1 = safeParseFloat(d.cal_1), v2 = safeParseFloat(d.cal_2);
-                let idx1 = v1 <= 4 ? 0 : v1 <= 6 ? 1 : v1 <= 8 ? 2 : 3;
-                let idx2 = v2 <= 4 ? 0 : v2 <= 6 ? 1 : v2 <= 8 ? 2 : 3;
+                const v1 = safeParseFloat(d.cal_1);
+                const v2 = safeParseFloat(d.cal_2);
+                let idx1 = 0, idx2 = 0;
+                if (v1 <= 4.0) idx1 = 0; else if (v1 <= 6.0) idx1 = 1; else if (v1 <= 8.0) idx1 = 2; else idx1 = 3;
+                if (v2 <= 4.0) idx2 = 0; else if (v2 <= 6.0) idx2 = 1; else if (v2 <= 8.0) idx2 = 2; else idx2 = 3;
                 distP1[idx1]++; distP2[idx2]++;
             });
+
             const total = data.length || 1;
             const pctP1 = distP1.map(v => ((v/total)*100).toFixed(1));
             const pctP2 = distP2.map(v => ((v/total)*100).toFixed(1));
@@ -624,34 +551,83 @@
                     { x: ranges, y: pctP2, name: 'Parcial 2', type: 'bar', text: pctP2.map(v=>v+'%'), textposition: 'auto', marker: { color: '#f97316' } }
                 ], { ...layoutBase, title: 'DISTRIBUCIÓN % POR PARCIAL', barmode: 'group', margin:{l:40} }, config);
             } else if (parcial === 'P1') {
-                Plotly.newPlot('chart-semaforo-dist', [{ x: ranges, y: pctP1, type: 'bar', name: 'Parcial 1', text: pctP1.map(v=>v+'%'), textposition: 'auto', marker: { color: '#3b82f6' } }], { ...layoutBase, title: 'DISTRIBUCIÓN % - PARCIAL 1', margin:{l:40} }, config);
+                Plotly.newPlot('chart-semaforo-dist', [{
+                    x: ranges, y: pctP1, type: 'bar', name: 'Parcial 1', text: pctP1.map(v=>v+'%'), textposition: 'auto',
+                    marker: { color: '#3b82f6' }
+                }], { ...layoutBase, title: 'DISTRIBUCIÓN % - PARCIAL 1', margin:{l:40} }, config);
             } else {
-                Plotly.newPlot('chart-semaforo-dist', [{ x: ranges, y: pctP2, type: 'bar', name: 'Parcial 2', text: pctP2.map(v=>v+'%'), textposition: 'auto', marker: { color: '#f97316' } }], { ...layoutBase, title: 'DISTRIBUCIÓN % - PARCIAL 2', margin:{l:40} }, config);
+                Plotly.newPlot('chart-semaforo-dist', [{
+                    x: ranges, y: pctP2, type: 'bar', name: 'Parcial 2', text: pctP2.map(v=>v+'%'), textposition: 'auto',
+                    marker: { color: '#f97316' }
+                }], { ...layoutBase, title: 'DISTRIBUCIÓN % - PARCIAL 2', margin:{l:40} }, config);
             }
 
-            Plotly.newPlot('chart-genero', [{ values: Object.values(getCounts('genero')), labels: Object.keys(getCounts('genero')), type: 'pie', hole: .6, marker: { colors: [PALETA.negro, PALETA.gris, '#cbd5e1'] } }], { ...layoutBase, title: 'GÉNERO', margin:{l:20} }, config);
-            Plotly.newPlot('chart-turno', [{ x: Object.keys(getCounts('turno')), y: Object.values(getCounts('turno')), type: 'bar', marker: {color: PALETA.tierra} }], { ...layoutBase, title: 'TURNO', margin:{l:40} }, config);
-            Plotly.newPlot('chart-estatus', [{ values: Object.values(getCounts('estatus')), labels: Object.keys(getCounts('estatus')), type: 'pie', marker: { colors: [PALETA.negro, PALETA.tierra, PALETA.gris] } }], { ...layoutBase, title: 'ESTATUS', margin:{l:20} }, config);
+            const generoCounts = getCounts('genero');
+            Plotly.newPlot('chart-genero', [{ 
+                values: Object.values(generoCounts), labels: Object.keys(generoCounts), 
+                type: 'pie', hole: .6, marker: { colors: [PALETA.negro, PALETA.gris, '#cbd5e1'] }
+            }], { ...layoutBase, title: 'GÉNERO', margin:{l:20} }, config);
+
+            const turnoCounts = getCounts('turno');
+            Plotly.newPlot('chart-turno', [{ 
+                x: Object.keys(turnoCounts), y: Object.values(turnoCounts), 
+                type: 'bar', marker: {color: PALETA.tierra} 
+            }], { ...layoutBase, title: 'TURNO', margin:{l:40} }, config);
+
+            const estatusCounts = getCounts('estatus');
+            Plotly.newPlot('chart-estatus', [{ 
+                values: Object.values(estatusCounts), labels: Object.keys(estatusCounts), 
+                type: 'pie', marker: { colors: [PALETA.negro, PALETA.tierra, PALETA.gris] }
+            }], { ...layoutBase, title: 'ESTATUS', margin:{l:20} }, config);
 
             const getAvgBy = (field) => {
                 const map = {};
-                data.forEach(d => { if(!map[d[field]]) map[d[field]] = { sum: 0, count: 0 }; map[d[field]].sum += getCalificacion(d, parcial); map[d[field]].count++; });
+                data.forEach(d => { 
+                    if(!d[field]) return;
+                    if(!map[d[field]]) map[d[field]] = { sum: 0, count: 0 }; 
+                    map[d[field]].sum += getCalificacion(d, parcial);
+                    map[d[field]].count++;
+                });
                 return Object.keys(map).map(k => ({ label: k, avg: map[k].sum / map[k].count })).sort((a,b) => a.avg - b.avg);
             };
             
             const planteles = getAvgBy('plantel');
-            Plotly.newPlot('chart-planteles', [{ x: planteles.map(i => i.avg), y: planteles.map(i => i.label), type: 'bar', orientation: 'h', marker:{color: PALETA.negro}, text: planteles.map(i => i.avg.toFixed(2)), textposition: 'outside' }], { ...layoutBase, title: 'RANKING PLANTELES', xaxis:{range:[0,11]} }, config);
+            Plotly.newPlot('chart-planteles', [{ 
+                x: planteles.map(i => i.avg), y: planteles.map(i => i.label), type: 'bar', orientation: 'h', 
+                marker:{color: PALETA.negro}, text: planteles.map(i => i.avg.toFixed(2)), textposition: 'outside'
+            }], { ...layoutBase, title: 'RANKING PLANTELES', xaxis:{range:[0,11]} }, config);
             
             const materias = getAvgBy('materia').slice(-20);
-            Plotly.newPlot('chart-materias', [{ x: materias.map(i => i.avg), y: materias.map(i => i.label), type: 'bar', orientation: 'h', marker:{color: PALETA.tierra}, text: materias.map(i => i.avg.toFixed(2)), textposition: 'outside' }], { ...layoutBase, title: 'TOP 20 MATERIAS', xaxis:{range:[0,11]} }, config);
+            Plotly.newPlot('chart-materias', [{ 
+                x: materias.map(i => i.avg), y: materias.map(i => i.label), type: 'bar', orientation: 'h', 
+                marker:{color: PALETA.tierra}, text: materias.map(i => i.avg.toFixed(2)), textposition: 'outside'
+            }], { ...layoutBase, title: 'TOP 20 MATERIAS', xaxis:{range:[0,11]} }, config);
         };
 
         const updateTable = (data) => {
             const consolidated = getConsolidatedData(data);
             document.getElementById('tableBody').innerHTML = consolidated.slice(0, 800).map(g => {
                 const promGeneral = parseFloat(g.PromedioGeneral);
-                let color = isNaN(promGeneral) ? 'color-rojo' : promGeneral <= 4 ? 'color-rojo' : promGeneral <= 6 ? 'color-amarillo' : promGeneral <= 8 ? 'color-naranja' : 'color-verde';
-                return `<tr><td class="p-4 border-r font-medium">${g.Plantel || ''}</td><td class="p-4 border-r text-center">${g.Semestre || ''}</td><td class="p-4 border-r text-stone-500 font-bold">${g.Turno || ''}</td><td class="p-4 text-center font-bold border-r">${g.Grupo || ''}</td><td class="p-4 border-r">${g.Materia || ''}</td><td class="p-4 border-r font-semibold">${g.Docente || ''}</td><td class="p-4 text-center border-r font-bold">${g.Alumnos || 0}</td><td class="p-4 text-center border-r">${g.PromCal1 || '0.00'}</td><td class="p-4 text-center border-r">${g.PromCal2 || '0.00'}</td><td class="p-4 text-center ${color}">${g.PromedioGeneral || '0.00'}</td></tr>`;
+                let color = '';
+                if (isNaN(promGeneral)) {
+                    color = 'color-rojo';
+                } else if (promGeneral <= 4) color = 'color-rojo';
+                else if (promGeneral <= 6) color = 'color-amarillo';
+                else if (promGeneral <= 8) color = 'color-naranja';
+                else color = 'color-verde';
+                
+                return `<tr>
+                    <td class="p-4 border-r font-medium">${g.Plantel || ''}</td>
+                    <td class="p-4 border-r text-center">${g.Semestre || ''}</td>
+                    <td class="p-4 border-r text-stone-500 font-bold">${g.Turno || ''}</td>
+                    <td class="p-4 text-center font-bold border-r">${g.Grupo || ''}</td>
+                    <td class="p-4 border-r">${g.Materia || ''}</td>
+                    <td class="p-4 border-r font-semibold">${g.Docente || ''}</td>
+                    <td class="p-4 text-center border-r font-bold">${g.Alumnos || 0}</td>
+                    <td class="p-4 text-center border-r">${g.PromCal1 || '0.00'}</td>
+                    <td class="p-4 text-center border-r">${g.PromCal2 || '0.00'}</td>
+                    <td class="p-4 text-center ${color}">${g.PromedioGeneral || '0.00'}</td>
+                </tr>`;
             }).join('');
         };
 
@@ -661,7 +637,7 @@
             for (let i = 0; i < tr.length; i++) tr[i].style.display = tr[i].innerText.toUpperCase().includes(input) ? "" : "none";
         }
 
-        const clearDatabase = () => { if(confirm("¿Restablecer sistema y borrar datos?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); } };
+        const clearDatabase = () => { if(confirm("¿Restablecer sistema y borrar todos los datos?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); } };
 
         window.onload = async () => {
             await initDB();
@@ -675,7 +651,6 @@
                     applyFilters(); 
                 }
             };
-            document.getElementById('syncButton').addEventListener('click', () => loadFromGoogleSheets());
         };
     </script>
 </body>
