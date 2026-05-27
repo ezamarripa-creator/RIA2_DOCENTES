@@ -1,6 +1,44 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+
+        <script>
+    (function() {
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            return false;
+        });
+      
+       document.addEventListener('keydown', function(e) {
+            const key = e.key.toLowerCase();
+            if ((e.ctrlKey && (key === 'u' || key === 's' || key === 'c' || key === 'i' || key === 'j')) ||
+                (e.ctrlKey && e.shiftKey && (key === 'i' || key === 'j' || key === 'c')) ||
+                e.key === 'F12') {
+                e.preventDefault();
+                return false;
+            }
+        });
+        
+        let devtoolsTriggered = false;
+        setInterval(function() {
+            if (devtoolsTriggered) return;
+            const before = new Date();
+            debugger; 
+            const after = new Date();
+            if (after - before > 100) { 
+                devtoolsTriggered = true;
+                document.body.innerHTML = '<div style="text-align:center; padding:50px; font-family:sans-serif;"><h1 style="color:#042C53;">⚠️ Acceso no autorizado</h1><p>El uso de herramientas de desarrollo no está permitido en este recurso institucional.</p><p style="font-size:14px; margin-top:30px;">🔒 COBAED · Dirección Académica</p></div>';
+            }
+        }, 2000);
+        
+        const style = document.createElement('style');
+        style.textContent = `body { user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }`;
+        document.head.appendChild(style);
+    })();
+    </script>
+
+    
+    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SISTEMA SEMS - Dashboard Ejecutivo (Google Drive Sync)</title>
@@ -11,7 +49,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    
+
     <!-- Google API Client Library -->
     <script src="https://apis.google.com/js/api.js"></script>
 
@@ -32,6 +70,7 @@
             color: var(--negro); 
         }
         
+        /* Colores de Semáforo para Tabla */
         .color-rojo { background-color: #fee2e2; color: #991b1b; font-weight: bold; }      
         .color-amarillo { background-color: #fef9c3; color: #854d0e; font-weight: bold; }  
         .color-naranja { background-color: #ffedd5; color: #9a3412; font-weight: bold; }   
@@ -55,7 +94,7 @@
 
         #loadingOverlay { 
             display: none; 
-            background: rgba(15, 23, 42, 0.95); 
+            background: rgba(15, 23, 42, 0.9); 
             z-index: 9999; 
             position: fixed; 
             inset: 0; 
@@ -83,16 +122,11 @@
             border: 1px solid var(--gris-base);
             transition: all 0.2s;
             border-radius: 4px;
-            font-size: 11px;
-            padding: 8px 12px;
         }
 
-        select:focus, input:focus { 
-            border-color: var(--tierra); 
-            outline: none; 
-            box-shadow: 0 0 0 2px rgba(120, 53, 15, 0.1); 
-        }
+        select:focus { border-color: var(--tierra); outline: none; box-shadow: 0 0 0 2px rgba(120, 53, 15, 0.1); }
 
+        /* Estilos Botones */
         .btn-action {
             font-size: 11px;
             font-weight: 700;
@@ -104,16 +138,23 @@
             align-items: center;
             gap: 10px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            cursor: pointer;
         }
         .btn-action:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
-        .btn-excel { background-color: #15803d; color: white; border: none; }
-        .btn-pdf { background-color: #b91c1c; color: white; border: none; }
-        .btn-sync { background-color: #1e40af; color: white; border: none; }
+        .btn-excel { background-color: #15803d; color: white; }
+        .btn-pdf { background-color: #b91c1c; color: white; }
+        .btn-sync { background-color: #1e40af; color: white; }
+        .btn-sync:disabled { background-color: #64748b; cursor: not-allowed; transform: none; }
 
-        button {
-            cursor: pointer;
+        .drive-status {
+            font-size: 10px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background-color: #1e293b;
+            color: #94a3b8;
         }
+        .drive-status.success { background-color: #14532d; color: #bbf7d0; }
+        .drive-status.error { background-color: #7f1d1d; color: #fecaca; }
+        .drive-status.syncing { background-color: #713f12; color: #fde047; }
     </style>
 </head>
 <body>
@@ -124,7 +165,7 @@
     </div>
 
     <nav class="bg-slate-950 text-white p-6 shadow-2xl border-b-4 border-amber-900">
-        <div class="container mx-auto flex justify-between items-center flex-wrap gap-4">
+        <div class="container mx-auto flex justify-between items-center">
             <div class="flex items-center gap-4">
                 <div class="h-10 w-1 bg-amber-700"></div>
                 <div>
@@ -133,18 +174,19 @@
                 </div>
             </div>
             <div class="flex gap-4 items-center">
-                <button id="syncDriveBtn" class="bg-amber-700 text-white px-6 py-2 rounded-sm text-[10px] font-black cursor-pointer hover:bg-amber-800 transition uppercase flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    Sincronizar con Google Drive
-                </button>
+                <div class="flex items-center gap-2">
+                    <span id="driveStatus" class="drive-status">📡 Verificando conexión...</span>
+                    <button id="syncButton" onclick="syncFromDrive()" class="bg-amber-700 hover:bg-amber-600 px-5 py-2 rounded-sm text-[10px] font-black transition uppercase flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        SINCRONIZAR
+                    </button>
+                </div>
                 <button onclick="clearDatabase()" class="text-stone-500 hover:text-red-400 text-[10px] uppercase font-bold">Reiniciar</button>
             </div>
         </div>
     </nav>
 
     <main class="container mx-auto p-4 lg:p-8">
-        <div id="syncStatus" class="mb-4 p-3 rounded-md text-xs font-bold hidden"></div>
-
         <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <div class="kpi-card p-6"><p class="text-[10px] font-bold text-slate-400 uppercase mb-2">Población Estudiantil</p><h2 id="kpi-alumnos" class="text-3xl font-bold">0</h2></div>
             <div class="kpi-card p-6">
@@ -161,21 +203,21 @@
 
         <div class="flex flex-col gap-6 mb-8">
             <div class="bg-white p-6 rounded shadow-sm border border-stone-200 grid grid-cols-2 md:grid-cols-5 lg:grid-cols-11 gap-4">
-                <select id="f-plantel" onchange="applyFilters()"></select>
-                <select id="f-semestre" onchange="applyFilters()"></select>
-                <select id="f-materia" onchange="applyFilters()"></select>
-                <select id="f-docente" onchange="applyFilters()"></select>
-                <select id="f-turno-filter" onchange="applyFilters()"></select>
-                <select id="f-nucleo" onchange="applyFilters()"></select>
-                <select id="f-area" onchange="applyFilters()"></select>
-                <select id="f-tipo" onchange="applyFilters()"></select>
-                <select id="f-sector" onchange="applyFilters()"></select>
-                <select id="f-parcial" onchange="applyFilters()" class="font-bold border-amber-200 bg-crema">
+                <select id="f-plantel" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+                <select id="f-semestre" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+                <select id="f-materia" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+                <select id="f-docente" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+                <select id="f-turno-filter" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+                <select id="f-nucleo" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+                <select id="f-area" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+                <select id="f-tipo" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+                <select id="f-sector" onchange="applyFilters()" class="text-[10px] p-2 rounded"></select>
+                <select id="f-parcial" onchange="applyFilters()" class="text-[10px] p-2 rounded font-bold border-amber-200 bg-crema">
                     <option value="ALL">PARCIAL (TODOS)</option>
                     <option value="P1">📘 PARCIAL 1</option>
                     <option value="P2">📗 PARCIAL 2</option>
                 </select>
-                <select id="f-semaforo" onchange="applyFilters()" class="font-bold border-amber-200 bg-crema">
+                <select id="f-semaforo" onchange="applyFilters()" class="text-[10px] p-2 rounded font-bold border-amber-200 bg-crema">
                     <option value="ALL">SEMÁFORO (TODOS)</option>
                     <option value="ROJO">🔴 CRÍTICO (0 - 4.0)</option>
                     <option value="AMARILLO">🟡 RIESGO (4.1 - 6.0)</option>
@@ -186,7 +228,7 @@
             
             <div class="flex flex-wrap justify-between items-center gap-4">
                 <div class="relative">
-                    <input type="text" id="search" onkeyup="searchTable()" placeholder="Buscar en el listado..." class="border border-stone-300 px-4 py-2.5 w-80 shadow-inner">
+                    <input type="text" id="search" onkeyup="searchTable()" placeholder="Buscar en el listado..." class="text-[11px] border border-stone-300 px-4 py-2.5 w-80 shadow-inner">
                 </div>
                 <div class="flex gap-3">
                     <button onclick="exportToExcel()" class="btn-action btn-excel">
@@ -220,7 +262,18 @@
             <div class="table-sticky">
                 <table class="w-full text-left text-[11px]" id="dataTable">
                     <thead>
-                        <tr><th class="p-4">Plantel</th><th>Semestre</th><th>Turno</th><th class="text-center">Grupo</th><th>Materia</th><th>Docente</th><th class="text-center">Alumnos</th><th class="text-center">Prom Cal1</th><th class="text-center">Prom Cal2</th><th class="text-center">Promedio General</th></tr>
+                        <tr>
+                            <th class="p-4">Plantel</th>
+                            <th>Semestre</th>
+                            <th>Turno</th>
+                            <th class="text-center">Grupo</th>
+                            <th>Materia</th>
+                            <th>Docente</th>
+                            <th class="text-center">Alumnos</th>
+                            <th class="text-center">Prom Cal1</th>
+                            <th class="text-center">Prom Cal2</th>
+                            <th class="text-center">Promedio General</th>
+                        </tr>
                     </thead>
                     <tbody id="tableBody" class="divide-y divide-stone-100"></tbody>
                 </table>
@@ -229,11 +282,9 @@
     </main>
 
     <script>
-        // CONFIGURACIÓN DEL ARCHIVO EN GOOGLE DRIVE
-        const DRIVE_FILE_ID = "1vTjGjeIwt1U9h1_OiMMy1IqpM-aH-jN9";
-        
-        // API Key pública (restringida para acceso solo a archivos públicos)
-        const API_KEY = "AIzaSyBCz0MZKFv8VNR2i1ng8d_QNBiRKYdhXcg";
+        // ==================== CONFIGURACIÓN ====================
+        const FILE_ID = "1vTjGjeIwt1U9h1_OiMMy1IqpM-aH-jN9";
+        const API_KEY = "AIzaSyD-9tSrP72kX7LHv9zAFqGXBPOO5Kc4S5Y"; // API Key pública para Drive (restringir en consola)
         
         const DB_NAME = 'SemsPremiumDB';
         const STORE_NAME = 'records';
@@ -245,40 +296,29 @@
             negro: '#0f172a', tierra: '#78350f', beige: '#f5f5f4', crema: '#fffbeb', gris: '#94a3b8'
         };
 
-        const safeParseFloat = (value) => {
-            if (value === null || value === undefined || value === '') return 0;
-            const num = parseFloat(value);
-            return isNaN(num) ? 0 : num;
-        };
-
-        const showStatus = (message, isError = false) => {
-            const statusDiv = document.getElementById('syncStatus');
-            statusDiv.textContent = message;
-            statusDiv.className = `mb-4 p-3 rounded-md text-xs font-bold ${isError ? 'bg-red-100 text-red-800 border border-red-300' : 'bg-green-100 text-green-800 border border-green-300'}`;
-            statusDiv.classList.remove('hidden');
-            setTimeout(() => { statusDiv.classList.add('hidden'); }, 6000);
-        };
-
+        // ==================== INICIALIZAR IndexedDB ====================
         const initDB = () => {
             return new Promise((resolve) => {
                 const request = indexedDB.open(DB_NAME, 1);
-                request.onupgradeneeded = (e) => {
-                    if (!e.target.result.objectStoreNames.contains(STORE_NAME)) {
-                        e.target.result.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-                    }
-                };
+                request.onupgradeneeded = (e) => e.target.result.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
                 request.onsuccess = (e) => { db = e.target.result; resolve(); };
-                request.onerror = () => { console.error("Error al abrir DB"); resolve(); };
+                request.onerror = () => resolve();
             });
         };
 
+        // ==================== GUARDAR EN BD ====================
         const saveDataToDB = async (rawData) => {
+            if (!db) await initDB();
             const tx = db.transaction(STORE_NAME, 'readwrite');
             const store = tx.objectStore(STORE_NAME);
             await store.clear();
-            for (let i = 0; i < rawData.length; i++) {
-                store.add(rawData[i]);
+
+            const chunkSize = 5000;
+            for (let i = 0; i < rawData.length; i += chunkSize) {
+                const chunk = rawData.slice(i, i + chunkSize);
+                chunk.forEach(item => store.add(item));
             }
+
             return new Promise((resolve) => {
                 tx.oncomplete = () => {
                     dataGlobal = rawData;
@@ -287,156 +327,144 @@
             });
         };
 
-        // Función CORREGIDA para leer archivo de Google Drive
-        const fetchFileFromDrive = () => {
-            return new Promise((resolve, reject) => {
-                if (!gapi || !gapi.client) {
-                    reject(new Error("Google API no está lista. Recargue la página."));
-                    return;
-                }
-
-                // Hacer la solicitud GET al archivo con la API de Drive
-                const request = gapi.client.drive.files.get({
-                    fileId: DRIVE_FILE_ID,
-                    alt: 'media'
-                });
-
-                request.execute((response) => {
-                    if (response && response.body) {
-                        // Si response.body es string, es CSV/JSON; si es objeto con size, es blob
-                        let dataToParse = response.body;
-                        let isBlob = false;
-                        
-                        if (response.body && typeof response.body === 'object' && response.body.size !== undefined) {
-                            isBlob = true;
-                            dataToParse = response.body;
-                        }
-                        
-                        const processData = (content) => {
-                            try {
-                                let parsedData = [];
-                                // Intentar parsear como CSV primero
-                                if (typeof content === 'string') {
-                                    // Verificar si parece CSV
-                                    if (content.includes(',') || content.includes('\t')) {
-                                        const result = Papa.parse(content, { header: true, skipEmptyLines: true });
-                                        if (result.data && result.data.length > 0) {
-                                            parsedData = result.data;
-                                        }
-                                    }
-                                    
-                                    // Si no se pudo parsear como CSV, intentar como JSON
-                                    if (parsedData.length === 0) {
-                                        try {
-                                            const json = JSON.parse(content);
-                                            parsedData = Array.isArray(json) ? json : [json];
-                                        } catch(e) {}
-                                    }
-                                }
-                                
-                                // Si es Blob/File, usar XLSX
-                                if (!isBlob && parsedData.length === 0) {
-                                    reject(new Error("No se pudieron leer los datos del archivo"));
-                                    return;
-                                }
-                                
-                                if (parsedData.length === 0 && isBlob) {
-                                    reject(new Error("El archivo está vacío"));
-                                    return;
-                                }
-                                
-                                resolve(parsedData);
-                            } catch (err) {
-                                reject(new Error("Error al procesar el archivo: " + err.message));
-                            }
-                        };
-                        
-                        if (isBlob) {
-                            const reader = new FileReader();
-                            reader.onload = (e) => processData(e.target.result);
-                            reader.onerror = () => reject(new Error("Error al leer el archivo"));
-                            reader.readAsText(dataToParse);
-                        } else {
-                            processData(dataToParse);
-                        }
-                    } else {
-                        reject(new Error("No se pudo obtener el archivo. Verifique que el ID sea correcto y que el archivo sea accesible públicamente."));
-                    }
-                });
-            });
-        };
-
-        let gapiInitialized = false;
-        const initGoogleAPI = () => {
-            return new Promise((resolve, reject) => {
-                if (gapiInitialized && gapi.client && gapi.client.drive) {
-                    resolve();
-                    return;
-                }
-                
-                gapi.load('client', () => {
-                    gapi.client.init({
-                        apiKey: API_KEY,
-                        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
-                    }).then(() => {
-                        gapiInitialized = true;
-                        resolve();
-                    }).catch((err) => {
-                        console.error("Error init Google API:", err);
-                        reject(new Error("No se pudo inicializar Google Drive API. Verifique su conexión."));
-                    });
-                });
-            });
-        };
-
-        const syncWithGoogleDrive = async () => {
-            const overlay = document.getElementById('loadingOverlay');
-            overlay.style.display = 'flex';
+        // ==================== OBTENER ARCHIVO DE DRIVE ====================
+        async function fetchDriveFileExports() {
+            // Método 1: Usar export=download con API Key (archivos públicos o compartidos con link)
+            // El archivo debe ser accesible "Cualquier persona con el enlace puede ver"
+            const exportUrl = `https://www.googleapis.com/drive/v3/files/${FILE_ID}/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&key=${API_KEY}`;
             
             try {
-                showStatus("🔄 Inicializando conexión con Google Drive...", false);
-                await initGoogleAPI();
+                const response = await fetch(exportUrl, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+                });
                 
-                showStatus("📥 Descargando archivo desde Google Drive...", false);
-                const rawData = await fetchFileFromDrive();
-                
-                if (!rawData || rawData.length === 0) {
-                    throw new Error("No se encontraron datos en el archivo.");
+                if (!response.ok) {
+                    // Si falla, intentamos descarga directa como binario
+                    const altUrl = `https://www.googleapis.com/drive/v3/files/${FILE_ID}?alt=media&key=${API_KEY}`;
+                    const altResponse = await fetch(altUrl);
+                    if (!altResponse.ok) throw new Error(`HTTP ${altResponse.status}`);
+                    const blob = await altResponse.blob();
+                    return blob;
                 }
                 
-                showStatus("💾 Guardando datos en el sistema...", false);
-                await saveDataToDB(rawData);
+                const blob = await response.blob();
+                return blob;
+            } catch (error) {
+                console.error("Error Drive API:", error);
+                throw new Error("No se pudo acceder al archivo. Verifica que el archivo sea público (cualquier persona con enlace puede ver)");
+            }
+        }
+
+        // ==================== LEER EXCEL DESDE BLOB ====================
+        const parseExcelBlob = (blob) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    try {
+                        const data = new Uint8Array(evt.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const json = XLSX.utils.sheet_to_json(sheet);
+                        resolve(json);
+                    } catch (e) {
+                        reject(e);
+                    }
+                };
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(blob);
+            });
+        };
+
+        // ==================== SINCRONIZACIÓN PRINCIPAL ====================
+        let isSyncing = false;
+        
+        async function syncFromDrive() {
+            if (isSyncing) {
+                alert("Ya hay una sincronización en curso, espera un momento.");
+                return;
+            }
+            
+            const syncBtn = document.getElementById('syncButton');
+            const statusSpan = document.getElementById('driveStatus');
+            
+            isSyncing = true;
+            syncBtn.disabled = true;
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            statusSpan.className = 'drive-status syncing';
+            statusSpan.innerHTML = '🔄 Sincronizando...';
+            
+            try {
+                // Obtener blob del archivo desde Drive
+                const blob = await fetchDriveFileExports();
                 
+                // Parsear Excel
+                const jsonData = await parseExcelBlob(blob);
+                
+                if (!jsonData || jsonData.length === 0) {
+                    throw new Error("El archivo está vacío o no contiene datos válidos");
+                }
+                
+                // Validar columnas mínimas esperadas
+                const requiredCols = ['plantel', 'semestre', 'materia', 'nombre_doc', 'cal_1', 'cal_2'];
+                const firstRow = jsonData[0] || {};
+                const missingCols = requiredCols.filter(col => !(col in firstRow));
+                if (missingCols.length > 0 && missingCols.length < requiredCols.length) {
+                    console.warn("Columnas faltantes:", missingCols);
+                    // No bloqueamos, solo advertencia
+                }
+                
+                // Guardar en IndexedDB
+                await saveDataToDB(jsonData);
+                
+                // Configurar filtros y actualizar UI
                 setupFilters();
                 applyFilters();
-                showStatus(`✅ Sincronización exitosa. Se cargaron ${rawData.length.toLocaleString()} registros.`, false);
+                
+                statusSpan.className = 'drive-status success';
+                statusSpan.innerHTML = '✅ Sincronizado: ' + new Date().toLocaleTimeString();
+                
+                // Pequeña animación de éxito
+                syncBtn.style.backgroundColor = '#15803d';
+                setTimeout(() => { syncBtn.style.backgroundColor = ''; }, 1000);
                 
             } catch (error) {
                 console.error("Error en sincronización:", error);
-                showStatus(`❌ Error al sincronizar: ${error.message}`, true);
+                statusSpan.className = 'drive-status error';
+                statusSpan.innerHTML = '❌ Error: ' + (error.message || 'No se pudo sincronizar');
+                alert("Error al sincronizar: " + error.message + "\n\nVerifica que:\n1. El archivo esté publicado como 'Cualquier persona con el enlace puede ver'\n2. El ID del archivo sea correcto\n3. Tu conexión a internet esté activa");
             } finally {
-                overlay.style.display = 'none';
+                document.getElementById('loadingOverlay').style.display = 'none';
+                isSyncing = false;
+                syncBtn.disabled = false;
             }
+        }
+
+        // ==================== CARGAR DATOS INICIALES DESDE DB ====================
+        const loadInitialDataFromDB = async () => {
+            if (!db) await initDB();
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const request = store.getAll();
+            
+            return new Promise((resolve) => {
+                request.onsuccess = (e) => {
+                    if (e.target.result && e.target.result.length > 0) {
+                        dataGlobal = e.target.result;
+                        setupFilters();
+                        applyFilters();
+                    }
+                    resolve();
+                };
+                request.onerror = () => resolve();
+            });
         };
 
-        const setupFilters = () => {
-            if (!dataGlobal || dataGlobal.length === 0) return;
-            
-            const fields = {
-                'f-plantel':'plantel', 'f-semestre':'semestre', 'f-materia':'materia', 
-                'f-docente':'nombre_doc', 'f-turno-filter':'turno', 'f-nucleo':'NUCLEO', 
-                'f-area':'Área de conocimiento', 'f-tipo':'TIPO', 'f-sector':'SECTOR'
-            };
-            
-            Object.keys(fields).forEach(id => {
-                const fieldName = fields[id];
-                const vals = [...new Set(dataGlobal.filter(item => item[fieldName]).map(item => item[fieldName]))].filter(Boolean).sort();
-                const label = id.replace('f-', '').replace('-filter','').toUpperCase();
-                const select = document.getElementById(id);
-                if (select) {
-                    select.innerHTML = `<option value="ALL">${label}</option>` + vals.map(v => `<option value="${String(v).replace(/"/g, '&quot;')}">${String(v)}</option>`).join('');
-                }
-            });
+        // ==================== FUNCIONES AUXILIARES ====================
+        const safeParseFloat = (value) => {
+            if (value === null || value === undefined || value === '') return 0;
+            const num = parseFloat(value);
+            return isNaN(num) ? 0 : num;
         };
 
         const getCalificacion = (item, parcial) => {
@@ -447,33 +475,47 @@
             return (p1 + p2) / 2;
         };
 
+        const setupFilters = () => {
+            if (!dataGlobal.length) return;
+            const fields = {
+                'f-plantel':'plantel', 'f-semestre':'semestre', 'f-materia':'materia', 
+                'f-docente':'nombre_doc', 'f-turno-filter':'turno', 'f-nucleo':'NUCLEO', 
+                'f-area':'Área de conocimiento', 'f-tipo':'TIPO', 'f-sector':'SECTOR'
+            };
+            Object.keys(fields).forEach(id => {
+                const vals = [...new Set(dataGlobal.map(item => item[fields[id]]))].filter(Boolean).sort();
+                let label = id.replace('f-', '').replace('-filter','').toUpperCase();
+                document.getElementById(id).innerHTML = `<option value="ALL">${label}</option>` + vals.map(v => `<option value="${v}">${v}</option>`).join('');
+            });
+        };
+
         const applyFilters = () => {
-            if (!dataGlobal || dataGlobal.length === 0) return;
+            if (!dataGlobal.length) return;
             
             const f = {
-                p: document.getElementById('f-plantel')?.value || 'ALL',
-                s: document.getElementById('f-semestre')?.value || 'ALL',
-                m: document.getElementById('f-materia')?.value || 'ALL',
-                d: document.getElementById('f-docente')?.value || 'ALL',
-                tr: document.getElementById('f-turno-filter')?.value || 'ALL',
-                n: document.getElementById('f-nucleo')?.value || 'ALL',
-                a: document.getElementById('f-area')?.value || 'ALL',
-                t: document.getElementById('f-tipo')?.value || 'ALL',
-                sec: document.getElementById('f-sector')?.value || 'ALL',
-                parcial: document.getElementById('f-parcial')?.value || 'ALL',
-                sema: document.getElementById('f-semaforo')?.value || 'ALL'
+                p: document.getElementById('f-plantel').value,
+                s: document.getElementById('f-semestre').value,
+                m: document.getElementById('f-materia').value,
+                d: document.getElementById('f-docente').value,
+                tr: document.getElementById('f-turno-filter').value,
+                n: document.getElementById('f-nucleo').value,
+                a: document.getElementById('f-area').value,
+                t: document.getElementById('f-tipo').value,
+                sec: document.getElementById('f-sector').value,
+                parcial: document.getElementById('f-parcial').value,
+                sema: document.getElementById('f-semaforo').value
             };
 
             currentFilteredData = dataGlobal.filter(d => {
-                const pass = (f.p === 'ALL' || String(d.plantel) == String(f.p)) && 
-                             (f.s === 'ALL' || String(d.semestre) == String(f.s)) && 
-                             (f.m === 'ALL' || String(d.materia) == String(f.m)) && 
-                             (f.d === 'ALL' || String(d.nombre_doc) == String(f.d)) && 
-                             (f.tr === 'ALL' || String(d.turno) == String(f.tr)) &&
-                             (f.n === 'ALL' || String(d.NUCLEO) == String(f.n)) && 
-                             (f.a === 'ALL' || String(d['Área de conocimiento']) == String(f.a)) && 
-                             (f.t === 'ALL' || String(d.TIPO) == String(f.t)) && 
-                             (f.sec === 'ALL' || String(d.SECTOR) == String(f.sec));
+                const pass = (f.p === 'ALL' || d.plantel == f.p) && 
+                             (f.s === 'ALL' || d.semestre == f.s) && 
+                             (f.m === 'ALL' || d.materia == f.m) && 
+                             (f.d === 'ALL' || d.nombre_doc == f.d) && 
+                             (f.tr === 'ALL' || d.turno == f.tr) &&
+                             (f.n === 'ALL' || d.NUCLEO == f.n) && 
+                             (f.a === 'ALL' || d['Área de conocimiento'] == f.a) && 
+                             (f.t === 'ALL' || d.TIPO == f.t) && 
+                             (f.sec === 'ALL' || d.SECTOR == f.sec);
                 
                 if (!pass) return false;
                 
@@ -514,7 +556,7 @@
         };
 
         const exportToExcel = () => {
-            if (!currentFilteredData.length) return alert("No hay datos cargados para exportar.");
+            if (currentFilteredData.length === 0) return alert("No hay datos cargados para exportar.");
             const consolidated = getConsolidatedData(currentFilteredData);
             const wsData = consolidated.map(g => ({
                 Plantel: g.Plantel, Semestre: g.Semestre, Turno: g.Turno, Grupo: g.Grupo,
@@ -528,7 +570,7 @@
         };
 
         const exportToPDF = () => {
-            if (!currentFilteredData.length) return alert("No hay datos cargados para exportar.");
+            if (currentFilteredData.length === 0) return alert("No hay datos cargados para exportar.");
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('l', 'mm', 'a4');
             const consolidated = getConsolidatedData(currentFilteredData);
@@ -538,12 +580,18 @@
             doc.setFontSize(22);
             doc.setTextColor(255, 255, 255);
             doc.text("COBAED - REPORTE EJECUTIVO DE DESEMPEÑO", 15, 22);
+            
             doc.setFontSize(10);
             doc.setTextColor(200, 200, 200);
             doc.text(`Generado el: ${new Date().toLocaleString()}`, 15, 28);
             doc.text(`Total registros: ${currentFilteredData.length}`, 240, 28);
 
-            const tableRows = consolidated.map(g => [g.Plantel, g.Semestre, g.Turno, g.Grupo, g.Materia, g.Docente, g.Alumnos, g.PromCal1, g.PromCal2, g.PromedioGeneral]);
+            const tableRows = consolidated.map(g => [
+                g.Plantel, g.Semestre, g.Turno, g.Grupo, 
+                g.Materia, g.Docente, g.Alumnos, 
+                g.PromCal1, g.PromCal2, g.PromedioGeneral
+            ]);
+
             doc.autoTable({
                 startY: 45,
                 head: [['PLANTEL', 'SEM.', 'TURNO', 'GRUPO', 'MATERIA', 'DOCENTE', 'REG.', 'PROM1', 'PROM2', 'GRAL.']],
@@ -551,13 +599,15 @@
                 theme: 'grid',
                 headStyles: { fillColor: [30, 41, 59], fontSize: 8, fontStyle: 'bold', halign: 'center' },
                 styles: { fontSize: 7, cellPadding: 2 },
-                alternateRowStyles: { fillColor: [248, 250, 252] }
+                alternateRowStyles: { fillColor: [248, 250, 252] },
+                columnStyles: { 6: { halign: 'center' }, 7: { halign: 'center' }, 8: { halign: 'center' }, 9: { halign: 'center', fontStyle: 'bold' } }
             });
+
             doc.save(`Reporte_Academico_${new Date().getTime()}.pdf`);
         };
 
         const updateKPIs = (data) => {
-            const parcial = document.getElementById('f-parcial')?.value || 'ALL';
+            const parcial = document.getElementById('f-parcial').value;
             const totalFiltrados = data.length;
             const registrosRiesgo = data.filter(d => getCalificacion(d, parcial) < 6.0).length;
             const porcentajeRiesgo = totalFiltrados > 0 ? ((registrosRiesgo / totalFiltrados) * 100).toFixed(1) : "0.0";
@@ -574,12 +624,15 @@
         };
 
         const updateCharts = (data) => {
-            if (!data.length) return;
-            const parcial = document.getElementById('f-parcial')?.value || 'ALL';
+            const parcial = document.getElementById('f-parcial').value;
             const config = { responsive: true, displayModeBar: false };
-            const layoutBase = { paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { size: 10, family: 'Inter' }, margin: { t: 40, b: 60, l: 150, r: 20 } };
-            
+            const layoutBase = { 
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', 
+                font: { size: 10, family: 'Inter', color: PALETA.negro }, 
+                margin: { t: 40, b: 60, l: 150, r: 20 } 
+            };
             const getCounts = (f) => { const c = {}; data.forEach(d => c[d[f]] = (c[d[f]] || 0) + 1); return c; };
+
             const ranges = ["0-4", "4.1-6", "6.1-8", "> 8"];
             let distP1 = [0,0,0,0], distP2 = [0,0,0,0];
             
@@ -601,17 +654,32 @@
                     { x: ranges, y: pctP1, name: 'Parcial 1', type: 'bar', text: pctP1.map(v=>v+'%'), textposition: 'auto', marker: { color: '#3b82f6' } },
                     { x: ranges, y: pctP2, name: 'Parcial 2', type: 'bar', text: pctP2.map(v=>v+'%'), textposition: 'auto', marker: { color: '#f97316' } }
                 ], { ...layoutBase, title: 'DISTRIBUCIÓN % POR PARCIAL', barmode: 'group', margin:{l:40} }, config);
-            } else {
-                const dataP = parcial === 'P1' ? pctP1 : pctP2;
-                const color = parcial === 'P1' ? '#3b82f6' : '#f97316';
+            } else if (parcial === 'P1') {
                 Plotly.newPlot('chart-semaforo-dist', [{
-                    x: ranges, y: dataP, type: 'bar', text: dataP.map(v=>v+'%'), textposition: 'auto', marker: { color: color }
-                }], { ...layoutBase, title: `DISTRIBUCIÓN % - ${parcial === 'P1' ? 'PARCIAL 1' : 'PARCIAL 2'}`, margin:{l:40} }, config);
+                    x: ranges, y: pctP1, type: 'bar', name: 'Parcial 1', text: pctP1.map(v=>v+'%'), textposition: 'auto',
+                    marker: { color: '#3b82f6' }
+                }], { ...layoutBase, title: 'DISTRIBUCIÓN % - PARCIAL 1', margin:{l:40} }, config);
+            } else {
+                Plotly.newPlot('chart-semaforo-dist', [{
+                    x: ranges, y: pctP2, type: 'bar', name: 'Parcial 2', text: pctP2.map(v=>v+'%'), textposition: 'auto',
+                    marker: { color: '#f97316' }
+                }], { ...layoutBase, title: 'DISTRIBUCIÓN % - PARCIAL 2', margin:{l:40} }, config);
             }
 
-            Plotly.newPlot('chart-genero', [{ values: Object.values(getCounts('genero')), labels: Object.keys(getCounts('genero')), type: 'pie', hole: .6, marker: { colors: [PALETA.negro, PALETA.gris] } }], { ...layoutBase, title: 'GÉNERO', margin:{l:20} }, config);
-            Plotly.newPlot('chart-turno', [{ x: Object.keys(getCounts('turno')), y: Object.values(getCounts('turno')), type: 'bar', marker: {color: PALETA.tierra} }], { ...layoutBase, title: 'TURNO', margin:{l:40} }, config);
-            Plotly.newPlot('chart-estatus', [{ values: Object.values(getCounts('estatus')), labels: Object.keys(getCounts('estatus')), type: 'pie', marker: { colors: [PALETA.negro, PALETA.tierra] } }], { ...layoutBase, title: 'ESTATUS', margin:{l:20} }, config);
+            Plotly.newPlot('chart-genero', [{ 
+                values: Object.values(getCounts('genero')), labels: Object.keys(getCounts('genero')), 
+                type: 'pie', hole: .6, marker: { colors: [PALETA.negro, PALETA.gris, '#cbd5e1'] }
+            }], { ...layoutBase, title: 'GÉNERO', margin:{l:20} }, config);
+
+            Plotly.newPlot('chart-turno', [{ 
+                x: Object.keys(getCounts('turno')), y: Object.values(getCounts('turno')), 
+                type: 'bar', marker: {color: PALETA.tierra} 
+            }], { ...layoutBase, title: 'TURNO', margin:{l:40} }, config);
+
+            Plotly.newPlot('chart-estatus', [{ 
+                values: Object.values(getCounts('estatus')), labels: Object.keys(getCounts('estatus')), 
+                type: 'pie', marker: { colors: [PALETA.negro, PALETA.tierra, PALETA.gris] }
+            }], { ...layoutBase, title: 'ESTATUS', margin:{l:20} }, config);
 
             const getAvgBy = (field) => {
                 const map = {};
@@ -624,62 +692,66 @@
             };
             
             const planteles = getAvgBy('plantel');
-            Plotly.newPlot('chart-planteles', [{ x: planteles.map(i => i.avg), y: planteles.map(i => i.label), type: 'bar', orientation: 'h', marker:{color: PALETA.negro}, text: planteles.map(i => i.avg.toFixed(2)), textposition: 'outside' }], { ...layoutBase, title: 'RANKING PLANTELES', xaxis:{range:[0,11]} }, config);
+            Plotly.newPlot('chart-planteles', [{ 
+                x: planteles.map(i => i.avg), y: planteles.map(i => i.label), type: 'bar', orientation: 'h', 
+                marker:{color: PALETA.negro}, text: planteles.map(i => i.avg.toFixed(2)), textposition: 'outside'
+            }], { ...layoutBase, title: 'RANKING PLANTELES', xaxis:{range:[0,11]} }, config);
             
             const materias = getAvgBy('materia').slice(-20);
-            Plotly.newPlot('chart-materias', [{ x: materias.map(i => i.avg), y: materias.map(i => i.label), type: 'bar', orientation: 'h', marker:{color: PALETA.tierra}, text: materias.map(i => i.avg.toFixed(2)), textposition: 'outside' }], { ...layoutBase, title: 'TOP 20 MATERIAS', xaxis:{range:[0,11]} }, config);
+            Plotly.newPlot('chart-materias', [{ 
+                x: materias.map(i => i.avg), y: materias.map(i => i.label), type: 'bar', orientation: 'h', 
+                marker:{color: PALETA.tierra}, text: materias.map(i => i.avg.toFixed(2)), textposition: 'outside'
+            }], { ...layoutBase, title: 'TOP 20 MATERIAS', xaxis:{range:[0,11]} }, config);
         };
 
         const updateTable = (data) => {
-            const consolidated = getConsolidatedData(data).slice(0, 800);
-            document.getElementById('tableBody').innerHTML = consolidated.map(g => {
+            const consolidated = getConsolidatedData(data);
+            document.getElementById('tableBody').innerHTML = consolidated.slice(0, 800).map(g => {
                 const promGeneral = parseFloat(g.PromedioGeneral);
                 let color = '';
-                if (isNaN(promGeneral)) color = 'color-rojo';
-                else if (promGeneral <= 4) color = 'color-rojo';
+                if (isNaN(promGeneral)) {
+                    color = 'color-rojo';
+                } else if (promGeneral <= 4) color = 'color-rojo';
                 else if (promGeneral <= 6) color = 'color-amarillo';
                 else if (promGeneral <= 8) color = 'color-naranja';
                 else color = 'color-verde';
                 
-                return `<tr><td class="p-4 border-r font-medium">${g.Plantel || ''}</td><td class="p-4 border-r text-center">${g.Semestre || ''}</td><td class="p-4 border-r text-stone-500 font-bold">${g.Turno || ''}</td><td class="p-4 text-center font-bold border-r">${g.Grupo || ''}</td><td class="p-4 border-r">${g.Materia || ''}</td><td class="p-4 border-r font-semibold">${g.Docente || ''}</td><td class="p-4 text-center border-r font-bold">${g.Alumnos || 0}</td><td class="p-4 text-center border-r">${g.PromCal1 || '0.00'}</td><td class="p-4 text-center border-r">${g.PromCal2 || '0.00'}</td><td class="p-4 text-center ${color}">${g.PromedioGeneral || '0.00'}</td></tr>`;
+                return `<tr>
+                    <td class="p-4 border-r font-medium">${g.Plantel || ''}</td>
+                    <td class="p-4 border-r text-center">${g.Semestre || ''}</td>
+                    <td class="p-4 border-r text-stone-500 font-bold">${g.Turno || ''}</td>
+                    <td class="p-4 text-center font-bold border-r">${g.Grupo || ''}</td>
+                    <td class="p-4 border-r">${g.Materia || ''}</td>
+                    <td class="p-4 border-r font-semibold">${g.Docente || ''}</td>
+                    <td class="p-4 text-center border-r font-bold">${g.Alumnos || 0}</td>
+                    <td class="p-4 text-center border-r">${g.PromCal1 || '0.00'}</td>
+                    <td class="p-4 text-center border-r">${g.PromCal2 || '0.00'}</td>
+                    <td class="p-4 text-center ${color}">${g.PromedioGeneral || '0.00'}</td>
+                </tr>`;
             }).join('');
         };
 
         function searchTable() {
             const input = document.getElementById('search').value.toUpperCase();
-            const rows = document.getElementById('tableBody').getElementsByTagName('tr');
-            for (let i = 0; i < rows.length; i++) {
-                rows[i].style.display = rows[i].innerText.toUpperCase().includes(input) ? "" : "none";
-            }
+            const tr = document.getElementById('tableBody').getElementsByTagName('tr');
+            for (let i = 0; i < tr.length; i++) tr[i].style.display = tr[i].innerText.toUpperCase().includes(input) ? "" : "none";
         }
 
-        const clearDatabase = () => { 
-            if(confirm("¿Restablecer sistema y borrar todos los datos?")) { 
-                indexedDB.deleteDatabase(DB_NAME); 
-                location.reload(); 
-            } 
-        };
+        const clearDatabase = () => { if(confirm("¿Restablecer sistema y borrar datos?")) { indexedDB.deleteDatabase(DB_NAME); location.reload(); } };
 
+        // ==================== INICIALIZAR ====================
         window.onload = async () => {
             await initDB();
-            const tx = db.transaction(STORE_NAME, 'readonly');
-            const store = tx.objectStore(STORE_NAME);
-            const request = store.getAll();
-            request.onsuccess = (e) => {
-                if (e.target.result && e.target.result.length > 0) { 
-                    dataGlobal = e.target.result; 
-                    setupFilters(); 
-                    applyFilters(); 
-                    showStatus("📊 Datos cargados desde almacenamiento local", false);
-                } else {
-                    showStatus("💡 Presione 'Sincronizar con Google Drive' para cargar los datos", false);
-                }
-            };
-            request.onerror = () => {
-                showStatus("💡 Presione 'Sincronizar con Google Drive' para cargar los datos", false);
-            };
+            await loadInitialDataFromDB();
             
-            document.getElementById('syncDriveBtn').addEventListener('click', syncWithGoogleDrive);
+            // Si no hay datos, mostrar mensaje para sincronizar
+            if (!dataGlobal.length) {
+                document.getElementById('driveStatus').innerHTML = '📭 Sin datos - Presiona SINCRONIZAR';
+                document.getElementById('driveStatus').className = 'drive-status';
+            } else {
+                document.getElementById('driveStatus').innerHTML = '✅ Datos cargados localmente';
+                document.getElementById('driveStatus').className = 'drive-status success';
+            }
         };
     </script>
 </body>
