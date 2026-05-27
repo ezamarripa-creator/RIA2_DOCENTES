@@ -1,44 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-
-        <script>
-    (function() {
-        document.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-            return false;
-        });
-      
-       document.addEventListener('keydown', function(e) {
-            const key = e.key.toLowerCase();
-            if ((e.ctrlKey && (key === 'u' || key === 's' || key === 'c' || key === 'i' || key === 'j')) ||
-                (e.ctrlKey && e.shiftKey && (key === 'i' || key === 'j' || key === 'c')) ||
-                e.key === 'F12') {
-                e.preventDefault();
-                return false;
-            }
-        });
-        
-        let devtoolsTriggered = false;
-        setInterval(function() {
-            if (devtoolsTriggered) return;
-            const before = new Date();
-            debugger; 
-            const after = new Date();
-            if (after - before > 100) { 
-                devtoolsTriggered = true;
-                document.body.innerHTML = '<div style="text-align:center; padding:50px; font-family:sans-serif;"><h1 style="color:#042C53;">⚠️ Acceso no autorizado</h1><p>El uso de herramientas de desarrollo no está permitido en este recurso institucional.</p><p style="font-size:14px; margin-top:30px;">🔒 COBAED · Dirección Académica</p></div>';
-            }
-        }, 2000);
-        
-        const style = document.createElement('style');
-        style.textContent = `body { user-select: none; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; }`;
-        document.head.appendChild(style);
-    })();
-    </script>
-
-    
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SISTEMA SEMS - Dashboard Ejecutivo (Google Drive Sync)</title>
@@ -49,9 +11,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-
-    <!-- Google API Client Library -->
-    <script src="https://apis.google.com/js/api.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -165,7 +124,7 @@
     </div>
 
     <nav class="bg-slate-950 text-white p-6 shadow-2xl border-b-4 border-amber-900">
-        <div class="container mx-auto flex justify-between items-center">
+        <div class="container mx-auto flex justify-between items-center flex-wrap gap-4">
             <div class="flex items-center gap-4">
                 <div class="h-10 w-1 bg-amber-700"></div>
                 <div>
@@ -173,9 +132,9 @@
                     <p class="text-[9px] text-slate-400 tracking-tighter">ESTABILIDAD · AUTORIDAD · CONTROL</p>
                 </div>
             </div>
-            <div class="flex gap-4 items-center">
+            <div class="flex gap-4 items-center flex-wrap">
                 <div class="flex items-center gap-2">
-                    <span id="driveStatus" class="drive-status">📡 Verificando conexión...</span>
+                    <span id="driveStatus" class="drive-status">📡 Verificando...</span>
                     <button id="syncButton" onclick="syncFromDrive()" class="bg-amber-700 hover:bg-amber-600 px-5 py-2 rounded-sm text-[10px] font-black transition uppercase flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                         SINCRONIZAR
@@ -284,7 +243,6 @@
     <script>
         // ==================== CONFIGURACIÓN ====================
         const FILE_ID = "1vTjGjeIwt1U9h1_OiMMy1IqpM-aH-jN9";
-        const API_KEY = "AIzaSyD-9tSrP72kX7LHv9zAFqGXBPOO5Kc4S5Y"; // API Key pública para Drive (restringir en consola)
         
         const DB_NAME = 'SemsPremiumDB';
         const STORE_NAME = 'records';
@@ -327,54 +285,68 @@
             });
         };
 
-        // ==================== OBTENER ARCHIVO DE DRIVE ====================
-        async function fetchDriveFileExports() {
-            // Método 1: Usar export=download con API Key (archivos públicos o compartidos con link)
-            // El archivo debe ser accesible "Cualquier persona con el enlace puede ver"
-            const exportUrl = `https://www.googleapis.com/drive/v3/files/${FILE_ID}/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&key=${API_KEY}`;
+        // ==================== MÉTODO 1: EXPORTAR COMO CSV DESDE GOOGLE SHEETS ====================
+        // Este método funciona con archivos públicos sin necesidad de OAuth
+        async function fetchFromGoogleSheetsCSV() {
+            // URL de exportación a CSV (funciona con archivos públicos)
+            const csvUrl = `https://docs.google.com/spreadsheets/d/${FILE_ID}/export?format=csv&gid=1540219431`;
             
             try {
-                const response = await fetch(exportUrl, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+                const response = await fetch(csvUrl);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const csvText = await response.text();
+                
+                // Usar PapaParse para convertir CSV a JSON
+                const result = Papa.parse(csvText, {
+                    header: true,
+                    dynamicTyping: true,
+                    skipEmptyLines: true
                 });
                 
-                if (!response.ok) {
-                    // Si falla, intentamos descarga directa como binario
-                    const altUrl = `https://www.googleapis.com/drive/v3/files/${FILE_ID}?alt=media&key=${API_KEY}`;
-                    const altResponse = await fetch(altUrl);
-                    if (!altResponse.ok) throw new Error(`HTTP ${altResponse.status}`);
-                    const blob = await altResponse.blob();
-                    return blob;
+                if (result.errors && result.errors.length > 0) {
+                    console.warn("Errores en parsing CSV:", result.errors);
                 }
                 
-                const blob = await response.blob();
-                return blob;
+                return result.data;
             } catch (error) {
-                console.error("Error Drive API:", error);
-                throw new Error("No se pudo acceder al archivo. Verifica que el archivo sea público (cualquier persona con enlace puede ver)");
+                console.error("Error en método CSV:", error);
+                throw error;
             }
         }
 
-        // ==================== LEER EXCEL DESDE BLOB ====================
-        const parseExcelBlob = (blob) => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (evt) => {
-                    try {
-                        const data = new Uint8Array(evt.target.result);
-                        const workbook = XLSX.read(data, { type: 'array' });
-                        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                        const json = XLSX.utils.sheet_to_json(sheet);
-                        resolve(json);
-                    } catch (e) {
-                        reject(e);
-                    }
-                };
-                reader.onerror = reject;
-                reader.readAsArrayBuffer(blob);
-            });
-        };
+        // ==================== MÉTODO 2: DESCARGAR COMO XLSX (alternativa) ====================
+        async function fetchFromGoogleSheetsXLSX() {
+            const xlsxUrl = `https://docs.google.com/spreadsheets/d/${FILE_ID}/export?format=xlsx`;
+            
+            try {
+                const response = await fetch(xlsxUrl);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const blob = await response.blob();
+                
+                // Leer el archivo Excel
+                const data = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        try {
+                            const arrayBuffer = evt.target.result;
+                            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                            const json = XLSX.utils.sheet_to_json(sheet);
+                            resolve(json);
+                        } catch (e) {
+                            reject(e);
+                        }
+                    };
+                    reader.onerror = reject;
+                    reader.readAsArrayBuffer(blob);
+                });
+                
+                return data;
+            } catch (error) {
+                console.error("Error en método XLSX:", error);
+                throw error;
+            }
+        }
 
         // ==================== SINCRONIZACIÓN PRINCIPAL ====================
         let isSyncing = false;
@@ -392,27 +364,49 @@
             syncBtn.disabled = true;
             document.getElementById('loadingOverlay').style.display = 'flex';
             statusSpan.className = 'drive-status syncing';
-            statusSpan.innerHTML = '🔄 Sincronizando...';
+            statusSpan.innerHTML = '🔄 Descargando archivo...';
+            
+            let jsonData = null;
+            let lastError = null;
             
             try {
-                // Obtener blob del archivo desde Drive
-                const blob = await fetchDriveFileExports();
+                // Intentar método 1: CSV (más confiable para archivos públicos)
+                statusSpan.innerHTML = '🔄 Leyendo hoja de cálculo (CSV)...';
+                jsonData = await fetchFromGoogleSheetsCSV();
                 
-                // Parsear Excel
-                const jsonData = await parseExcelBlob(blob);
+                if (!jsonData || jsonData.length === 0) {
+                    throw new Error("El archivo CSV está vacío");
+                }
                 
+            } catch (csvError) {
+                console.warn("Error en método CSV, intentando XLSX...", csvError);
+                lastError = csvError;
+                statusSpan.innerHTML = '🔄 Intentando formato Excel...';
+                
+                try {
+                    jsonData = await fetchFromGoogleSheetsXLSX();
+                    
+                    if (!jsonData || jsonData.length === 0) {
+                        throw new Error("El archivo XLSX está vacío");
+                    }
+                } catch (xlsxError) {
+                    console.error("Todos los métodos fallaron:", xlsxError);
+                    throw new Error(`No se pudo acceder al archivo. Verifica que:\n1. El archivo sea público (cualquier persona con enlace puede ver)\n2. El ID sea correcto\n3. El archivo exista\n\nDetalle: ${lastError?.message || xlsxError.message}`);
+                }
+            }
+            
+            try {
+                statusSpan.innerHTML = '🔄 Procesando datos...';
+                
+                // Validar que tenemos datos
                 if (!jsonData || jsonData.length === 0) {
                     throw new Error("El archivo está vacío o no contiene datos válidos");
                 }
                 
-                // Validar columnas mínimas esperadas
-                const requiredCols = ['plantel', 'semestre', 'materia', 'nombre_doc', 'cal_1', 'cal_2'];
+                // Mostrar primeras columnas para debug (opcional)
                 const firstRow = jsonData[0] || {};
-                const missingCols = requiredCols.filter(col => !(col in firstRow));
-                if (missingCols.length > 0 && missingCols.length < requiredCols.length) {
-                    console.warn("Columnas faltantes:", missingCols);
-                    // No bloqueamos, solo advertencia
-                }
+                const columnNames = Object.keys(firstRow);
+                console.log("Columnas encontradas:", columnNames.slice(0, 10));
                 
                 // Guardar en IndexedDB
                 await saveDataToDB(jsonData);
@@ -422,17 +416,17 @@
                 applyFilters();
                 
                 statusSpan.className = 'drive-status success';
-                statusSpan.innerHTML = '✅ Sincronizado: ' + new Date().toLocaleTimeString();
+                statusSpan.innerHTML = `✅ Sincronizado: ${jsonData.length} registros - ${new Date().toLocaleTimeString()}`;
                 
-                // Pequeña animación de éxito
+                // Animación de éxito
                 syncBtn.style.backgroundColor = '#15803d';
                 setTimeout(() => { syncBtn.style.backgroundColor = ''; }, 1000);
                 
             } catch (error) {
-                console.error("Error en sincronización:", error);
+                console.error("Error procesando datos:", error);
                 statusSpan.className = 'drive-status error';
-                statusSpan.innerHTML = '❌ Error: ' + (error.message || 'No se pudo sincronizar');
-                alert("Error al sincronizar: " + error.message + "\n\nVerifica que:\n1. El archivo esté publicado como 'Cualquier persona con el enlace puede ver'\n2. El ID del archivo sea correcto\n3. Tu conexión a internet esté activa");
+                statusSpan.innerHTML = '❌ Error procesando: ' + (error.message || 'Datos inválidos');
+                alert("Error al procesar el archivo: " + error.message);
             } finally {
                 document.getElementById('loadingOverlay').style.display = 'none';
                 isSyncing = false;
@@ -485,25 +479,33 @@
             Object.keys(fields).forEach(id => {
                 const vals = [...new Set(dataGlobal.map(item => item[fields[id]]))].filter(Boolean).sort();
                 let label = id.replace('f-', '').replace('-filter','').toUpperCase();
-                document.getElementById(id).innerHTML = `<option value="ALL">${label}</option>` + vals.map(v => `<option value="${v}">${v}</option>`).join('');
+                const selectEl = document.getElementById(id);
+                if (selectEl) {
+                    selectEl.innerHTML = `<option value="ALL">${label}</option>` + vals.map(v => `<option value="${v}">${v}</option>`).join('');
+                }
             });
         };
 
         const applyFilters = () => {
             if (!dataGlobal.length) return;
             
+            const getSelectValue = (id) => {
+                const el = document.getElementById(id);
+                return el ? el.value : 'ALL';
+            };
+            
             const f = {
-                p: document.getElementById('f-plantel').value,
-                s: document.getElementById('f-semestre').value,
-                m: document.getElementById('f-materia').value,
-                d: document.getElementById('f-docente').value,
-                tr: document.getElementById('f-turno-filter').value,
-                n: document.getElementById('f-nucleo').value,
-                a: document.getElementById('f-area').value,
-                t: document.getElementById('f-tipo').value,
-                sec: document.getElementById('f-sector').value,
-                parcial: document.getElementById('f-parcial').value,
-                sema: document.getElementById('f-semaforo').value
+                p: getSelectValue('f-plantel'),
+                s: getSelectValue('f-semestre'),
+                m: getSelectValue('f-materia'),
+                d: getSelectValue('f-docente'),
+                tr: getSelectValue('f-turno-filter'),
+                n: getSelectValue('f-nucleo'),
+                a: getSelectValue('f-area'),
+                t: getSelectValue('f-tipo'),
+                sec: getSelectValue('f-sector'),
+                parcial: getSelectValue('f-parcial'),
+                sema: getSelectValue('f-semaforo')
             };
 
             currentFilteredData = dataGlobal.filter(d => {
@@ -607,7 +609,7 @@
         };
 
         const updateKPIs = (data) => {
-            const parcial = document.getElementById('f-parcial').value;
+            const parcial = document.getElementById('f-parcial')?.value || 'ALL';
             const totalFiltrados = data.length;
             const registrosRiesgo = data.filter(d => getCalificacion(d, parcial) < 6.0).length;
             const porcentajeRiesgo = totalFiltrados > 0 ? ((registrosRiesgo / totalFiltrados) * 100).toFixed(1) : "0.0";
@@ -624,7 +626,7 @@
         };
 
         const updateCharts = (data) => {
-            const parcial = document.getElementById('f-parcial').value;
+            const parcial = document.getElementById('f-parcial')?.value || 'ALL';
             const config = { responsive: true, displayModeBar: false };
             const layoutBase = { 
                 paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', 
@@ -749,7 +751,7 @@
                 document.getElementById('driveStatus').innerHTML = '📭 Sin datos - Presiona SINCRONIZAR';
                 document.getElementById('driveStatus').className = 'drive-status';
             } else {
-                document.getElementById('driveStatus').innerHTML = '✅ Datos cargados localmente';
+                document.getElementById('driveStatus').innerHTML = `✅ ${dataGlobal.length} registros cargados localmente`;
                 document.getElementById('driveStatus').className = 'drive-status success';
             }
         };
